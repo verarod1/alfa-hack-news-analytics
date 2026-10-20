@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+pandas
+networkx
+beautifulsoup4
+feedparser
+python-dotenv
+requests
