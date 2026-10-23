@@ -8,3 +8,4 @@ beautifulsoup4
 feedparser
 python-dotenv
 requests
+psycopg[binary]
