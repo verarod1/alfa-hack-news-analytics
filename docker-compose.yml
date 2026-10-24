@@ -27,7 +27,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://alfa_user:${POSTGRES_PASSWORD}@db:5432/alfa_news
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://alfa_user:${POSTGRES_PASSWORD}@db:5432/alfa_news}
+      DATA_DIR: /app/data
     volumes:
       - ./data:/app/data
     ports:
