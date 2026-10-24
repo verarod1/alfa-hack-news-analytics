@@ -19,6 +19,8 @@ build/
 data/raw/*.csv
 data/raw/*.xlsx
 data/raw/*.zip
+data/raw/bank_analytics/
+data/chroma_db/
 
 # Системные файлы и IDE
 .DS_Store

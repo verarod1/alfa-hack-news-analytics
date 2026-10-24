@@ -9,3 +9,8 @@ feedparser
 python-dotenv
 requests
 psycopg[binary]
+openai
+chromadb
+pypdf
+pymupdf
+sentence-transformers
