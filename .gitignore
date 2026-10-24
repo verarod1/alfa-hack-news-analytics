@@ -24,3 +24,14 @@ data/raw/*.zip
 .DS_Store
 .idea/
 .vscode/
+# Исходные данные хакатона и дополнительные секретные env-файлы
+data/df_*.csv
+data/**/*.csv
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+
+# Локальные доверенные тексты банковских материалов
+data/bank_materials/
