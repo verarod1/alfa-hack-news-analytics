@@ -10,7 +10,12 @@ from app.services.errors import ServiceError
 def bank_materials():
     path = Settings().bank_materials_path
     if not path:
-        return []
+        # Манифест создаёт только явный локальный индексатор PDF, не запрос API.
+        from app.services.rag import manifest_path
+        location = manifest_path()
+        if not location.exists():
+            return []
+        path = str(location)
     location = Path(path)
     if not location.is_absolute():
         location = ROOT / location

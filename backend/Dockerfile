@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+# Можно явно передать уже проверенный локальный Python-образ с зависимостями.
+ARG PYTHON_IMAGE=python:3.11-slim
+FROM ${PYTHON_IMAGE}
 
 WORKDIR /app
 
