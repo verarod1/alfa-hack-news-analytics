@@ -173,6 +173,38 @@ class PostgreSQLTests(TestCase):
         self.assertEqual(feed["ranking_mode"], "relevance")
         self.assertEqual(feed["items"][0]["id"], ids[0])
 
+    def test_zz_integrated_ml_ranking_analysis_and_chat(self):
+        """Реальный PostgreSQL + subprocess gateway + ML-адаптер; только LLM заменён."""
+        from scripts.rank_news import rank_batch
+        from app.repositories.news_repository import get_news
+        os.environ["ML_ADAPTER_MODULE"] = "ml_pipeline_test_adapter"
+        os.environ["LLM_TIMEOUT_SECONDS"] = "5"
+        with patch('scripts.rank_news.list_news', return_value=([get_news(self.news.id)], 1)):
+            for company, role in [("U_81", "cfo"), ("U_81", "ceo"), ("U_84", "cfo")]:
+                self.assertEqual(rank_batch(company, role, 1)["saved"], [self.news.id])
+        with psycopg.connect(self.dsn) as conn:
+            scores = conn.execute("SELECT company_id,role,score FROM news_relevance WHERE news_id=%s", (self.news.id,)).fetchall()
+        self.assertEqual(len({row[2] for row in scores}), 3)
+        feed = self.client.get('/api/v1/feed', params={'company_id': 'U_81', 'role': 'cfo', 'limit': 100}).json()
+        item = next(item for item in feed['items'] if item['id'] == self.news.id)
+        self.assertEqual(item['relevance_score'], .91)
+        # Ошибка ML не создаёт новую оценку и не заменяет старую фиктивной.
+        with patch('scripts.rank_news.list_news', return_value=([get_news(self.news.id)], 1)), patch('app.services.ml_gateway.rank', return_value={}):
+            self.assertEqual(rank_batch('U_81', 'cfo', 1)['failed'], [self.news.id])
+        aid = self.create()
+        self.assertEqual(self.client.get('/api/v1/analyses/' + aid).json()['status'], 'queued')
+        process_analysis(aid)
+        result = self.client.get('/api/v1/analyses/' + aid).json()
+        self.assertEqual(result['status'], 'completed', result)
+        self.assertIsNone(result['result']['bank_opinion'])
+        reply = self.client.post('/api/v1/chat/messages', json={'analysis_id': aid, 'message': '[ТЕСТ] Почему?'})
+        self.assertEqual(reply.status_code, 200, reply.text)
+        self.assertEqual(reply.json()['evidence_ids'], ['e_test'])
+        history = self.client.get('/api/v1/analyses/' + aid + '/messages').json()
+        self.assertEqual([item['role'] for item in history['items']], ['user', 'assistant'])
+        filtered = self.client.get('/api/v1/feed', params={'company_id': 'U_81', 'role': 'cfo', 'impact_type': 'risk', 'limit': 100}).json()
+        self.assertIn(self.news.id, [item['id'] for item in filtered['items']])
+
     def test_profiles_relations_and_client_restrictions(self):
         profile = self.client.get("/api/v1/companies/U_81").json()
         self.assertEqual(

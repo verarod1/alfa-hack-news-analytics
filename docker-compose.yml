@@ -46,10 +46,17 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
       MAX_ANALYSIS_ATTEMPTS: ${MAX_ANALYSIS_ATTEMPTS:-3}
       ANALYSIS_LEASE_SECONDS: ${ANALYSIS_LEASE_SECONDS:-900}
-      BANK_MATERIALS_PATH: ${BANK_MATERIALS_PATH:-}
       DATA_DIR: ${DOCKER_DATA_DIR:-/app/data/raw}
+      BANK_PDF_DIR: /app/data/raw/bank_analytics
+      CHROMA_DB_DIR: /app/data/chroma_db
+      OCR_CACHE_DIR: /app/data/ocr_cache
+      HF_HOME: /app/data/model_cache
+      BANK_MATERIALS_PATH: ${DOCKER_BANK_MATERIALS_PATH:-}
     volumes:
       - ./data:/app/data:ro
+      - ./data/chroma_db:/app/data/chroma_db:rw
+      - ./data/ocr_cache:/app/data/ocr_cache:rw
+      - ./data/model_cache:/app/data/model_cache:rw
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

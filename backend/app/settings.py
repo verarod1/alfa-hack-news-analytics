@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     max_analysis_attempts: int = Field(default=3, ge=1, le=10)
     analysis_lease_seconds: int = Field(default=900, ge=60, le=86400)
     bank_materials_path: str = ""
+    bank_pdf_dir: str = "data/raw/bank_analytics"
+    chroma_db_dir: str = "data/chroma_db"
+    ocr_cache_dir: str = "data/ocr_cache"
+    hf_home: str = "data/model_cache"
+    embedding_model: str = "intfloat/multilingual-e5-small"
+    llm_rank_model: str = ""
+    llm_chat_model: str = ""
+    llm_ocr_model: str = "Qwen3-VL-30B-A3B-Instruct"
+    rag_top_k: int = Field(default=3, ge=1, le=10)
     news_sources: str = "cbr,minfin,fns"
     news_cbr_rss_url: str = "https://www.cbr.ru/rss/RssPress"
     news_minfin_rss_url: str = "https://minfin.gov.ru/rss_news?mod=news&lim=50"

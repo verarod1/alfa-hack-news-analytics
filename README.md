@@ -1,6 +1,6 @@
 # 🚀 Новостная аналитика Альфа-Банка (Alfa Hack 2026)
 
-В репозитории подготовлены Backend, Docker-конфигурация и ручной сбор новостей ЦБ, Минфина и ФНС. Схемы PostgreSQL применяются отдельно; ML-ветка подключается отдельно. Доступность источников и проверки сборщика описаны в [инструкции](docs/NEWS_COLLECTOR.md).
+В репозитории подготовлены Backend, Docker-конфигурация и ручной сбор новостей ЦБ, Минфина и ФНС. Схемы PostgreSQL применяются отдельно; адаптер ML подключён в интеграционной ветке, реальные вызовы включаются конфигурацией. Доступность источников и проверки сборщика описаны в [инструкции](docs/NEWS_COLLECTOR.md).
 
 ## 🛠 Как запустить проект у себя
 
@@ -47,7 +47,7 @@ python -m venv .venv
 
 3. **Установите зависимости бэкенда локально:**
 ```bash
-pip install -r backend/requirements.txt
+(cd backend && python -m pip install -r requirements.txt)
 
 ```
 
@@ -108,6 +108,22 @@ python backend/scripts/collect_news.py --source cbr --limit 3 --dry-run
 Команды Docker, настройки, проверенные ограничения и стыковка с ML:
 [NEWS_COLLECTOR.md](docs/NEWS_COLLECTOR.md).
 
+## Интегрированный сценарий MVP
+
+После загрузки новостей и настройки `ML_ADAPTER_MODULE=team_ml.adapter`:
+
+```sh
+# Ограниченный запуск; с настоящим LLM-ключом расходует бюджет.
+python backend/scripts/rank_news.py --company-id U_81 --role cfo --limit 3
+# После POST /api/v1/analyses обработать очередь:
+python backend/scripts/process_analyses.py --limit 3
+```
+
+Ранкер сохраняет оценки отдельно для каждой компании/роли; ошибки не заменяются
+выдуманными числами. RAG и OCR запускаются отдельно, постоянные каталоги состояния
+монтируются для записи, исходные CSV/PDF — только для чтения.
+Команды индексации, конфигурация и ограничения: [Backend + ML](docs/README_ML_CORE.md).
+
 ## Backend с нуля и интеграция ML
 
 Нужны Python 3.11, Docker Compose и разрешённые локальные CSV. Приватность
@@ -128,7 +144,7 @@ DATABASE_URL намеренно не переносится в контейне�
 это не меняет пароль самой существующей БД.
 
 **Следующие команды создают таблицы и загружают данные. Они приведены как инструкция;
-для рабочей БД нужны отдельное разрешение и резервная копия. Автоматически они не запускались.**
+для рабочей БД нужны отдельное разрешение и резервная копия. Схемы не применяются при старте API.**
 
 ```sh
 # Запуск PostgreSQL (не удаляет volumes).
@@ -140,7 +156,7 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v O
 # Старые completed-результаты отдельно проверить на новый DTO statements/sources.
 ```
 
-CSV поместите непосредственно в data/ с именами, указанными в разделе импорта.
+CSV поместите в `data/raw/` согласно `DATA_DIR` с именами из раздела импорта.
 Для локальной загрузки используйте `python backend/scripts/import_csv.py`. По умолчанию
 заполненные таблицы не очищаются; --replace явно заменяет три исходные таблицы.
 Демонстрационные новости: `python backend/scripts/seed_demo_news.py`; скрипт пишет
@@ -194,7 +210,7 @@ ranking_mode=chronological и relevance_score=null — это ещё не пер
 ```sh
 # Unit/mock без рабочей базы:
 python -B -m unittest discover -s backend/tests -v
-# 8 интеграционных сценариев в отдельном временном PostgreSQL без TCP/volumes:
+# Интеграционные сценарии в отдельном временном PostgreSQL без TCP/volumes:
 POSTGRES_TEST_BIN=/opt/homebrew/opt/postgresql@16/bin python -B backend/scripts/run_integration_tests.py
 ```
 
