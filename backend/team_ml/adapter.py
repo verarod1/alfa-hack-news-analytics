@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import json
+from typing import Any  # <--- Добавили для правильной типизации
 from app.services.rag import retrieve_analytics
 from app.services.llm_client import call_llm
 
@@ -55,7 +56,7 @@ SYSTEM_PROMPT = """
 """
 
 
-def _fallback_result(news: dict) -> dict:
+def _fallback_result(news: dict[str, Any]) -> dict[str, Any]:
     """Безопасная заглушка, которая проходит все Pydantic-схемы бэкенда."""
     title = news.get("title", "Событие")
     return {
@@ -82,7 +83,7 @@ def _fallback_result(news: dict) -> dict:
     }
 
 
-def analyze(context: dict) -> dict:
+def analyze(context: dict[str, Any]) -> dict[str, Any]:  # <--- Добавили [str, Any]
     """
     Главная функция, которую вызывает Backend.
     context содержит: company, news, role, relations, bank_materials.
@@ -126,14 +127,12 @@ def analyze(context: dict) -> dict:
         result_dict = json.loads(raw_json)
         if "result" not in result_dict:
             raise ValueError("Модель не вернула ключ result")
-    except (json.JSONDecodeError, ValueError) as e:
+    except ValueError as e:  # <--- JSONDecodeError наследуется от ValueError
         print(f" [ОШИБКА LLM] {e}")
         return {"result": _fallback_result(news), "steps": []}
 
     res = result_dict["result"]
 
-    # --- САНИТАЙЗЕР (Чистим ответ от галлюцинаций нейросети) ---
-    
     # 1. bank_opinion должен быть null, если нет чанков
     if not bank_chunks:
         res["bank_opinion"] = None
@@ -159,11 +158,11 @@ def analyze(context: dict) -> dict:
     # Бэкенд сам подставит свои шаги и статусы
     return {
         "result": res,
-        "steps": [] 
+        "steps": []
     }
 
 
-def chat(context: dict) -> dict:
+def chat(context: dict[str, Any]) -> dict[str, Any]:  # <--- Добавили [str, Any]
     """
     Ответ на вопрос пользователя в чате.
     """

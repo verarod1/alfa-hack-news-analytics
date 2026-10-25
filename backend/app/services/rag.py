@@ -23,10 +23,14 @@ else:
 
 PDF_DIR = str(DATA_DIR / "raw" / "bank_analytics")
 
-# Сохраняем и базу, и кэш во временную папку, чтобы обойти read-only в Докере
-TEMP_DIR = tempfile.gettempdir()
-CHROMA_DB_DIR = os.path.join(TEMP_DIR, "chroma_db")
-CACHE_FILE = os.path.join(TEMP_DIR, "extracted_text_cache.json")
+# Теперь мы используем постоянные папки, которые проброшены в Docker
+CHROMA_DB_DIR = str(DATA_DIR / "chroma_db")
+CACHE_DIR = DATA_DIR / "cache"
+CACHE_FILE = str(CACHE_DIR / "extracted_text_cache.json")
+
+# Создаем папки, если их нет
+os.makedirs(CHROMA_DB_DIR, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 print("Загрузка модели эмбеддингов...")
 embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
