@@ -19,6 +19,9 @@ build/
 data/raw/*.csv
 data/raw/*.xlsx
 data/raw/*.zip
+data/raw/bank_analytics/
+data/chroma_db/
+data/cache/
 
 # Системные файлы и IDE
 .DS_Store
@@ -35,3 +38,21 @@ data/**/*.csv
 
 # Локальные доверенные тексты банковских материалов
 data/bank_materials/
+# Банковские PDF и создаваемые ML-артефакты остаются локально.
+data/raw/bank_analytics/
+data/chroma_db/
+data/rag_cache/
+data/ocr_cache/
+
+# Локальные модели и постоянное состояние ML
+data/model_cache/
+
+# Исходные документы и локальные базы/дампы
+*.pdf
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Старый путь OCR-кэша ML-ветки тоже не публикуется
+data/cache/

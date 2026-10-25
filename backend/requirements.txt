@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
 -c requirements.lock
 fastapi==0.161.0
 uvicorn[standard]==0.54.0
@@ -9,4 +11,12 @@ beautifulsoup4==4.15.0
 feedparser==6.0.14
 python-dotenv==1.2.4
 requests==2.34.2
+truststore==0.10.5
 psycopg[binary]==3.3.6
+
+# ML: CPU PyTorch, Qwen/OpenAI adapter, embeddings and persistent Chroma.
+openai
+chromadb
+pypdf
+pymupdf
+sentence-transformers

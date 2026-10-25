@@ -8,7 +8,7 @@ import subprocess
 import sys
 from urllib.parse import urlsplit
 from pathlib import Path
-from app.settings import Settings
+from app.settings import Settings, ROOT
 from app.services.errors import ServiceError
 
 ALLOWED_LLM_MODELS = {
@@ -55,6 +55,16 @@ def invoke(operation, context):
         LLM_API_KEY=settings.llm_api_key.get_secret_value(),
         LLM_MAX_TOKENS=str(settings.llm_max_tokens),
         ML_PROCESS_TIMEOUT=str(settings.llm_timeout_seconds + 2),
+        LLM_TIMEOUT_SECONDS=str(settings.llm_timeout_seconds),
+        LLM_RANK_MODEL=settings.llm_rank_model,
+        LLM_CHAT_MODEL=settings.llm_chat_model,
+        LLM_OCR_MODEL=settings.llm_ocr_model,
+        CHROMA_DB_DIR=settings.chroma_db_dir,
+        HF_HOME=str(ROOT / settings.hf_home),
+        OCR_CACHE_DIR=settings.ocr_cache_dir,
+        EMBEDDING_MODEL=settings.embedding_model,
+        RAG_TOP_K=str(settings.rag_top_k),
+        HF_HUB_OFFLINE="1",
     )
     backend = Path(__file__).resolve().parents[2]
     env["PYTHONPATH"] = str(backend) + os.pathsep + env.get("PYTHONPATH", "")
@@ -98,3 +108,7 @@ def analyze(context):
 
 def chat(context):
     return invoke("chat", context)
+
+
+def rank(context):
+    return invoke("rank", context)
