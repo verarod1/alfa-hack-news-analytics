@@ -4,10 +4,8 @@ import { MOCK_COMPANIES, MOCK_DEMO_PROFILES, MOCK_ROLES } from '../mocks/compani
 import { mockChatHistory, mockChatMessage } from '../mocks/chat';
 import { mockAnalysis, mockAnalysisTrace, mockFeed, mockNews } from '../mocks/news';
 
-// TODO: Когда заработает backend, создайте frontend/.env.local с VITE_USE_MOCK_API=false
-// и перезапустите Vite (или пересоберите Docker-образ). Все методы ниже переключатся на /api/v1.
-// VITE_API_BASE_URL нужен только если API доступен не через тот же origin и прокси.
-const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API !== 'false';
+// Реальный API используется по умолчанию. Моки доступны только по явному флагу для UI-разработки.
+const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true';
 export const isMockApi = USE_MOCK_API;
 
 // Задержка используется только в демо, чтобы можно было проверить состояния загрузки.
@@ -53,19 +51,7 @@ export function getFeed(companyId: string, role: string, impactType?: 'risk' | '
 export const getNews = (newsId: string, signal?: AbortSignal): Promise<NewsDetail> =>
   USE_MOCK_API ? delay(mockNews(newsId), 650) : fetchNews(newsId, signal);
 
-function waitForPoll(signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) { reject(new DOMException('Запрос отменён', 'AbortError')); return; }
-    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, 2000);
-    const abort = () => { clearTimeout(timer); reject(new DOMException('Запрос отменён', 'AbortError')); };
-    signal?.addEventListener('abort', abort, { once: true });
-  });
-}
-
-// TODO: Если в GET /feed analysis_id=null, реальный режим отправляет POST /api/v1/analyses
-// с {company_id, role, news_id}. Затем опрашивает GET /api/v1/analyses/{analysis_id}
-// до completed/failed. Если analysis_id уже есть, POST не нужен. Интервал 2 с и лимит 30
-// опросов — временная политика фронтенда; согласуйте Retry-After/таймаут с backend.
+// Без ML API возвращает queued/running. Показываем статус сразу, не держим экран в минутном опросе.
 export async function getAnalysisForNews(
   companyId: string,
   role: string,
@@ -90,32 +76,25 @@ export async function getAnalysisForNews(
     if (!id) throw new Error('Сервер не вернул идентификатор разбора.');
     onStatus?.(started.status);
   }
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    const response = await fetchAnalysis(id, signal);
-    onStatus?.(response.status);
-    if (response.status === 'completed') {
-      if (!response.result) throw new Error('Сервер завершил разбор без результата.');
-      return response;
-    }
-    if (response.status === 'failed') throw new Error('Не удалось подготовить разбор. Попробуйте ещё раз.');
-    await waitForPoll(signal);
-  }
-  throw new Error('Разбор готовится слишком долго. Попробуйте открыть его позже.');
+  const response = await fetchAnalysis(id, companyId, signal);
+  onStatus?.(response.status);
+  if (response.status === 'completed' && !response.result) throw new Error('Сервер завершил разбор без результата.');
+  return response;
 }
 
 // TODO: Реальный режим вызывает GET /api/v1/analyses/{analysis_id}/trace.
 // Показывайте шаги агентного анализа только после completed; source_ids связывают их с источниками.
-export const getAnalysisTrace = (analysisId: string, signal?: AbortSignal): Promise<AnalysisTrace> =>
-  USE_MOCK_API ? delay(mockAnalysisTrace(analysisId), 250) : fetchAnalysisTrace(analysisId, signal);
+export const getAnalysisTrace = (analysisId: string, companyId: string, signal?: AbortSignal): Promise<AnalysisTrace> =>
+  USE_MOCK_API ? delay(mockAnalysisTrace(analysisId), 250) : fetchAnalysisTrace(analysisId, companyId, signal);
 
 // TODO: Реальный режим вызывает GET /api/v1/analyses/{analysis_id}/messages?limit=&offset=.
 // Используйте total/offset для пагинации истории; экран пока запрашивает первую страницу из 20 сообщений.
-export const getChatHistory = (analysisId: string, limit = 20, offset = 0, signal?: AbortSignal): Promise<ChatHistoryResponse> =>
-  USE_MOCK_API ? delay(mockChatHistory(analysisId, limit, offset)) : fetchChatHistory(analysisId, limit, offset, signal);
+export const getChatHistory = (analysisId: string, companyId: string, limit = 20, offset = 0, signal?: AbortSignal): Promise<ChatHistoryResponse> =>
+  USE_MOCK_API ? delay(mockChatHistory(analysisId, limit, offset)) : fetchChatHistory(analysisId, companyId, limit, offset, signal);
 
 // TODO: Реальный режим вызывает POST /api/v1/chat/messages с analysis_id, conversation_id
 // и message. Возвращённый conversation_id передаётся при следующих вопросах.
-export function sendChatMessage(analysisId: string, conversationId: string | null, message: string): Promise<ChatResponse> {
-  if (!USE_MOCK_API) return postChatMessage(analysisId, conversationId, message);
+export function sendChatMessage(analysisId: string, conversationId: string | null, message: string, companyId: string): Promise<ChatResponse> {
+  if (!USE_MOCK_API) return postChatMessage(analysisId, conversationId, message, companyId);
   return delay(mockChatMessage(analysisId, conversationId, message));
 }

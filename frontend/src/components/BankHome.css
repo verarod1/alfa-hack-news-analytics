@@ -72,12 +72,12 @@
 .bank-home-promo-blue { background: linear-gradient(125deg, #add5ec, #8ec8e8); }
 .bank-home-promo-peach { background: linear-gradient(125deg, #edb99f, #e6a889); }
 .bank-home-promo-peach > span { background: #a175bd; transform: rotate(14deg); }
-.bank-home-analytics-card { display: flex; align-items: center; gap: 17px; min-height: 101px; margin-top: 28px; padding: 16px 23px; border: 1px solid #f1dad8; border-radius: 14px; background: #fff; box-shadow: 0 8px 22px #20252c0a; }
-.bank-home-analytics-mark { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 14px; background: #fff0ef; color: #ef3124; font-size: 26px; }
+.bank-home-analytics-card { display: flex; align-items: center; gap: 22px; width: 100%; min-height: 150px; margin: 28px 0 0; padding: 24px 28px; border: 1px solid #d5e8d0; border-radius: 16px; background: linear-gradient(120deg, #f5faf1, #e8f3e2); box-shadow: 0 12px 28px #5b86521a; }
+.bank-home-analytics-mark { display: grid; place-items: center; flex: none; width: 62px; height: 62px; border-radius: 18px; background: #ffffffb8; color: #ef3124; font-size: 32px; }
 .bank-home-analytics-card > div { min-width: 0; }
 .bank-home-analytics-eyebrow { color: #e4382c; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
-.bank-home-analytics-card h2 { margin: 3px 0 1px; font-size: 20px; line-height: 1.2; }
-.bank-home-analytics-card p { color: #73757b; font-size: 13px; }
+.bank-home-analytics-card h2 { margin: 5px 0 4px; color: #263b2a; font-size: 26px; line-height: 1.2; }
+.bank-home-analytics-card p { color: #536c55; font-size: 14px; }
 .bank-home-analytics-card button { display: inline-flex; align-items: center; gap: 9px; flex: none; min-height: 40px; margin-left: auto; padding: 9px 14px; border: 0; border-radius: 9px; background: #ef3124; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .bank-home-analytics-card button:hover { background: #d52b20; }
 .bank-home-operations { min-height: 350px; margin-top: 28px; padding: 0 10px 28px; border-radius: 16px; background: #fff; box-shadow: 0 8px 22px #20252c0a; }
@@ -165,6 +165,9 @@
 :root[data-theme='dark'] .bank-home-analytics-link { background: #35201f; color: #ffaaa4; }
 :root[data-theme='dark'] .bank-home-analytics-link:hover { background: #482724; }
 :root[data-theme='dark'] .bank-home-analytics-mark { background: #35201f; }
+:root[data-theme='dark'] .bank-home-analytics-card { border-color: #3d5a40; background: linear-gradient(120deg, #202c21, #2b3d2d); box-shadow: 0 12px 28px #0004; }
+:root[data-theme='dark'] .bank-home-analytics-card h2 { color: #f0f5ef; }
+:root[data-theme='dark'] .bank-home-analytics-card p { color: #c1d1c0; }
 :root[data-theme='dark'] .bank-home-sidebar-rule { background: #34363b; }
 :root[data-theme='dark'] .bank-home-account-footer span:first-child,
 :root[data-theme='dark'] .bank-home-own-funds,

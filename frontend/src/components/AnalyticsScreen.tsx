@@ -188,7 +188,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
         if (analysisData.status === 'completed') {
           // TODO: После MVP реальный режим должен загружать историю через GET /messages.
           // Добавьте conversation_id в ответ истории, чтобы продолжать тот же диалог после перезагрузки.
-          void getAnalysisTrace(analysisData.analysis_id, controller.signal)
+          void getAnalysisTrace(analysisData.analysis_id, company.id, controller.signal)
             .then((data) => { if (requestId === detailRequest.current) setTrace(data); })
             .catch(() => { /* Разбор доступен и без необязательной трассировки. */ });
           if (isMockApi) {
@@ -197,7 +197,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
             setConversationId(saved?.conversationId ?? null);
             setChatStorageScope({ companyId: company.id, roleCode, analysisId: analysisData.analysis_id });
           } else {
-            void getChatHistory(analysisData.analysis_id, 20, 0, controller.signal)
+            void getChatHistory(analysisData.analysis_id, company.id, 20, 0, controller.signal)
               .then((data) => {
                 if (requestId !== detailRequest.current) return;
                 setChatMessages((current) => {
@@ -221,7 +221,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
     setChatLoading(true);
     setChatError(null);
     try {
-      const response = await sendChatMessage(analysis.analysis_id, conversationId, sentQuestion);
+      const response = await sendChatMessage(analysis.analysis_id, conversationId, sentQuestion, company.id);
       setConversationId(response.conversation_id);
       const createdAt = new Date().toISOString();
       setChatMessages((current) => [...current,
@@ -249,7 +249,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
           <p className="analytics-subtitle">Риски, возможности и события в вашей отрасли</p>
           <section className="analytics-company" aria-label="Выбранный профиль">
             <span className="analytics-company-icon" aria-hidden="true">▦</span>
-            <div className="analytics-company-details"><strong>{company.company_name}</strong><p>{company.industry.name} · {company.region}</p></div>
+            <div className="analytics-company-details"><strong>{company.company_name}</strong><p>{company.industry.name ?? 'Отрасль не указана'} · {company.region ?? 'Регион не указан'}</p></div>
             <div className="analytics-role-control">
               <label htmlFor="active-role">Роль пользователя</label>
               <select
@@ -282,10 +282,10 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
             {!loading && !error && items.length === 0 && <p className="analytics-state">По этому фильтру событий пока нет.</p>}
             {!loading && !error && <div className="analytics-grid">
               {items.map((item) => <article className="analytics-event" key={item.id}>
-                <time dateTime={item.published_at}>{dateFormat.format(new Date(item.published_at))}</time>
-                <span className={`analytics-pill analytics-pill--${item.impact_type}`}>{impactLabel[item.impact_type]}</span>
+                <time dateTime={item.published_at ?? undefined}>{item.published_at ? dateFormat.format(new Date(item.published_at)) : 'Дата не указана'}</time>
+                {item.impact_type && <span className={`analytics-pill analytics-pill--${item.impact_type}`}>{impactLabel[item.impact_type]}</span>}
                 <h3>{item.title}</h3>
-                <p>{item.short_insight ?? 'Персональный вывод ещё готовится.'}</p>
+                <p>{item.short_insight ?? 'Персональная оценка появится после подключения ML.'}</p>
                 <div className="analytics-event-footer"><button type="button" onClick={() => void openDetail(item)}>{item.analysis_id ? 'Открыть разбор' : 'Разобрать новость'} <span aria-hidden="true">→</span></button></div>
               </article>)}
             </div>}
@@ -294,11 +294,11 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
       </main>
       {selected && <div className="detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDetail(); }}>
         <section className="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title" aria-busy={!news && !detailError}>
-          <div className="detail-header"><div><span className={`analytics-pill analytics-pill--${selected.impact_type}`}>{impactLabel[selected.impact_type]}</span><h2 id="detail-title">{selected.title}</h2></div><button ref={closeButton} type="button" className="detail-close" onClick={closeDetail} aria-label="Закрыть разбор">×</button></div>
+          <div className="detail-header"><div>{selected.impact_type && <span className={`analytics-pill analytics-pill--${selected.impact_type}`}>{impactLabel[selected.impact_type]}</span>}<h2 id="detail-title">{selected.title}</h2></div><button ref={closeButton} type="button" className="detail-close" onClick={closeDetail} aria-label="Закрыть разбор">×</button></div>
           {!news && !detailError && <DetailLoading status={analysisStatus} />}
-          {detailError && <div role="alert" className="detail-error"><p>{detailError}</p><button type="button" onClick={() => void openDetail({ ...selected, analysis_id: null })}>Повторить разбор</button></div>}
+          {detailError && <div role="alert" className="detail-error"><p>{detailError}</p><button type="button" onClick={() => void openDetail(selected)}>Повторить</button></div>}
           {news && <>
-            <p className="detail-meta">{dateFormat.format(new Date(news.published_at))} · {news.source.name}</p>
+            <p className="detail-meta">{news.published_at ? dateFormat.format(new Date(news.published_at)) : 'Дата не указана'} · {news.source.name ?? 'Источник не указан'}</p>
             <div className="detail-tabs" role="tablist" aria-label="Содержание новости">
               {detailTabs.map((tab) => <button
                 key={tab.id}
@@ -321,7 +321,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
               >{tab.label}</button>)}
             </div>
             <div id="detail-panel-analysis" role="tabpanel" aria-labelledby="detail-tab-analysis" hidden={detailTab !== 'analysis'}>
-              <div className="detail-section"><h3>Что произошло</h3><p>{analysis?.result?.what_happened ?? news.text}</p></div>
+              <div className="detail-section"><h3>Что произошло</h3><p>{analysis?.result?.what_happened ?? news.text ?? 'Текст новости недоступен.'}</p></div>
               {analysis?.result ? <>
                 <div className="detail-section"><h3>Почему это важно для компании</h3><p>{analysis.result.why_important}</p></div>
                 {analysis.result.company_factors.length > 0 && <div className="detail-section"><h3>Учтённые данные компании</h3><ul>{analysis.result.company_factors.map((factor) => <li key={factor.field}><strong>{factorLabels[factor.field] ?? factor.field}</strong>: {formatFactorValue(factor.value)} — {factor.impact}</li>)}</ul></div>}
@@ -332,7 +332,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
                 <div className="detail-section detail-recommendations"><h3>Рекомендуемые действия</h3><ul>{analysis.result.recommended_actions.map((action, index) => <li key={index}>{action.text}</li>)}</ul></div>
                 <div className="detail-section"><h3>Источники и ограничения</h3><ul>{analysis.result.sources.map((source) => <li key={source.id}>{source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title ?? source.url}</a> : source.document_title}</li>)}{analysis.result.limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul></div>
                 {trace && <details className="detail-section detail-trace"><summary>Как получен вывод</summary><ol>{trace.steps.map((step) => <li key={step.order}>{step.summary}</li>)}</ol></details>}
-              </> : <p className="detail-section">Разбор ещё не готов.</p>}
+              </> : <div className="detail-section" role="status"><p>{analysis?.status === 'failed' ? 'Обработка завершилась с ошибкой.' : analysis?.status === 'running' ? 'Разбор обрабатывается.' : 'Разбор поставлен в очередь.'}</p><p>ML пока не подключён. Когда обработка станет доступна, откройте новость снова, чтобы проверить статус.</p>{analysis?.disclaimer && <p>{analysis.disclaimer}</p>}</div>}
             </div>
             <div id="detail-panel-chat" role="tabpanel" aria-labelledby="detail-tab-chat" hidden={detailTab !== 'chat'}>
               {analysis?.result && <form className="detail-chat" onSubmit={(event) => void askQuestion(event)}>

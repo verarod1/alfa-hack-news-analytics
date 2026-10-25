@@ -134,6 +134,12 @@ export const DemoLaunchpad: React.FC<DemoLaunchpadProps> = ({ onSelectProfile, t
             </div>
           )}
 
+          {!isLoading && !error && companies.length === 0 && (
+            <div className="status-banner status-banner--loading" role="status">
+              Демо-профили пока не загружены. Проверьте импорт исходных CSV и DEMO_COMPANY_IDS.
+            </div>
+          )}
+
           <section className="companies-grid" aria-label="Список компаний">
             {companies.map((company) => {
               const currentRole = selectedRoles[company.id] || roles[0]?.code || 'ceo';
@@ -151,7 +157,7 @@ export const DemoLaunchpad: React.FC<DemoLaunchpadProps> = ({ onSelectProfile, t
                         <span className="param-bullet" aria-hidden="true">•</span>
                         Отрасль
                       </span>
-                      <span className="param-value">{company.industry.name}</span>
+                      <span className="param-value">{company.industry.name ?? 'Нет данных'}</span>
                     </li>
                     <li className="company-param-row">
                       <span className="param-label">
@@ -172,7 +178,7 @@ export const DemoLaunchpad: React.FC<DemoLaunchpadProps> = ({ onSelectProfile, t
                         <span className="param-bullet" aria-hidden="true">•</span>
                         Регион
                       </span>
-                      <span className="param-value">{company.region}</span>
+                      <span className="param-value">{company.region ?? 'Нет данных'}</span>
                     </li>
                   </ul>
 
@@ -246,10 +252,10 @@ export const DemoLaunchpad: React.FC<DemoLaunchpadProps> = ({ onSelectProfile, t
               <input
                 type="text"
                 className="search-input"
-                placeholder="Поиск компании по ID из базы данных..."
+                placeholder="Поиск компании-клиента в базе по ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Поиск компании по ID из базы данных"
+                aria-label="Поиск компании-клиента в базе по ID"
               />
               {searchQuery && (
                 <button

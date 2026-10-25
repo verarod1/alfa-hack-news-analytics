@@ -249,6 +249,7 @@ export const MOCK_COMPANIES: CompanyProfile[] = [
 
 export function formatRevenue(revenue: CompanyProfile['revenue']): string {
   const { value, unit } = revenue;
+  if (value === null) return 'Нет данных';
   if (unit === 'unconfirmed') return `${value.toLocaleString('ru-RU')} (единица не подтверждена)`;
   if (unit !== 'RUB') return `${value.toLocaleString('ru-RU')} ${unit}`;
   if (value >= 1_000_000_000) {

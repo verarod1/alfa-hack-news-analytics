@@ -15,7 +15,7 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function request<T>(endpoint: string, options?: RequestInit, companyId?: string): Promise<T> {
   // TODO: Если backend потребует токен интернет-банка, добавьте его здесь из
   // согласованного механизма авторизации. Не храните секреты или API-ключи в VITE_*.
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -23,6 +23,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       ...(options?.headers || {}),
+      ...(companyId ? { 'X-Company-ID': companyId } : {}),
     },
   });
 
@@ -47,7 +48,7 @@ export async function fetchDemoProfiles(): Promise<DemoProfilesResponse> {
 }
 
 export async function fetchCompanyById(companyId: string): Promise<CompanyProfile> {
-  return request<CompanyProfile>(`/companies/${encodeURIComponent(companyId.trim())}`);
+  return request<CompanyProfile>(`/companies/${encodeURIComponent(companyId.trim())}`, undefined, companyId.trim());
 }
 
 export async function fetchRoles(): Promise<RolesResponse> {
@@ -62,15 +63,15 @@ export async function fetchFeed(companyId: string, role: string, impactType?: 'r
     offset: String(offset),
   });
   if (impactType) params.set('impact_type', impactType);
-  return request<FeedResponse>(`/feed?${params.toString()}`);
+  return request<FeedResponse>(`/feed?${params.toString()}`, undefined, companyId);
 }
 
 export const fetchNews = (newsId: string, signal?: AbortSignal) => request<NewsDetail>(`/news/${encodeURIComponent(newsId)}`, { signal });
-export const fetchAnalysis = (analysisId: string, signal?: AbortSignal) => request<AnalysisResponse>(`/analyses/${encodeURIComponent(analysisId)}`, { signal });
-export const startAnalysis = (companyId: string, role: string, newsId: string, signal?: AbortSignal) => request<StartAnalysisResponse>('/analyses', { method: 'POST', body: JSON.stringify({ company_id: companyId, role, news_id: newsId }), signal });
-export const postChatMessage = (analysisId: string, conversationId: string | null, message: string) => request<ChatResponse>('/chat/messages', { method: 'POST', body: JSON.stringify({ analysis_id: analysisId, conversation_id: conversationId, message }) });
-export const fetchAnalysisTrace = (analysisId: string, signal?: AbortSignal) => request<AnalysisTrace>(`/analyses/${encodeURIComponent(analysisId)}/trace`, { signal });
-export function fetchChatHistory(analysisId: string, limit = 20, offset = 0, signal?: AbortSignal): Promise<ChatHistoryResponse> {
+export const fetchAnalysis = (analysisId: string, companyId: string, signal?: AbortSignal) => request<AnalysisResponse>(`/analyses/${encodeURIComponent(analysisId)}`, { signal }, companyId);
+export const startAnalysis = (companyId: string, role: string, newsId: string, signal?: AbortSignal) => request<StartAnalysisResponse>('/analyses', { method: 'POST', body: JSON.stringify({ company_id: companyId, role, news_id: newsId }), signal, headers: { 'Idempotency-Key': `${companyId}:${role}:${newsId}` } }, companyId);
+export const postChatMessage = (analysisId: string, conversationId: string | null, message: string, companyId: string) => request<ChatResponse>('/chat/messages', { method: 'POST', body: JSON.stringify({ analysis_id: analysisId, conversation_id: conversationId, message }), headers: { 'Idempotency-Key': crypto.randomUUID() } }, companyId);
+export const fetchAnalysisTrace = (analysisId: string, companyId: string, signal?: AbortSignal) => request<AnalysisTrace>(`/analyses/${encodeURIComponent(analysisId)}/trace`, { signal }, companyId);
+export function fetchChatHistory(analysisId: string, companyId: string, limit = 20, offset = 0, signal?: AbortSignal): Promise<ChatHistoryResponse> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  return request<ChatHistoryResponse>(`/analyses/${encodeURIComponent(analysisId)}/messages?${params}`, { signal });
+  return request<ChatHistoryResponse>(`/analyses/${encodeURIComponent(analysisId)}/messages?${params}`, { signal }, companyId);
 }

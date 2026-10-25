@@ -1,12 +1,12 @@
 # 🚀 Новостная аналитика Альфа-Банка (Alfa Hack 2026)
 
-Привет, команда! Репозиторий полностью настроен. Вся инфраструктура завернута в Docker, чтобы ни у кого не было проблем с версиями Python, Node.js или конфликтами библиотек.
+В репозитории подготовлены Backend и Docker-конфигурация. Backend проверен до этапа подключения ML; схемы PostgreSQL применяются отдельно, а модель и внешний новостной поток пока не подключены.
 
 ## 🛠 Как запустить проект у себя
 
 1. **Склонируйте репозиторий:**
    ```bash
-   git clone <ссылка_на_репозиторий>
+   git clone https://github.com/verarod1/alfa-hack-news-analytics.git
    cd alfa-hack-news-analytics
     ```
 
@@ -17,7 +17,7 @@
     ```
 
 
-Откройте появившийся файл `.env` и вставьте актуальный API-ключ хакатона.
+Откройте `.env` и задайте непустой `POSTGRES_PASSWORD`. ML пока отключён: ключ и Base URL заполняются только при подключении адаптера. Не добавляйте `.env` и исходные CSV в Git.
 3. **Запустите всё одной командой:**
 Убедитесь, что Docker Desktop запущен, и выполните:
 ```bash
@@ -53,6 +53,135 @@ pip install -r backend/requirements.txt
 
 
 4. В VS Code нажмите `Ctrl+Shift+P` (или `Cmd+Shift+P`), введите `Python: Select Interpreter` и выберите созданное окружение (`'.venv': venv`).
+
+## Импорт CSV в PostgreSQL
+
+Импортёр проверяет три CSV и загружает их в `raw_companies`, `raw_payments`
+и `raw_person_links`. Без аргументов запуск разрешён только при пустых таблицах:
+повторный импорт останавливается без удаления данных и добавления дубликатов.
+При ошибке загрузки изменения откатываются. Схема БД должна быть подготовлена заранее.
+
+Запуск из корня проекта с активированным виртуальным окружением:
+
+```sh
+python backend/scripts/import_csv.py
+```
+
+`--replace` нужен для полной перезагрузки: добавьте его к команде запуска.
+**Он заменяет существующие данные трёх таблиц и может временно блокировать чтение.**
+Проверьте целевую базу и сохраните резервную копию перед использованием.
+
+Настройки берутся из окружения или корневого `.env` (окружение имеет приоритет):
+
+- `DATABASE_URL` — строка подключения; имеет приоритет над отдельными параметрами.
+- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` — по умолчанию
+  `127.0.0.1`, `5433`, `alfa_news`, `alfa_user`; `POSTGRES_PASSWORD` — обязательный пароль.
+- `DATA_DIR` — каталог CSV: по умолчанию `data/`, в Docker — `/app/data`.
+- `DOCKER_DATABASE_URL` — переопределение подключения backend в Compose.
+  Используйте адрес `db:5432` и URL-кодирование специальных символов пароля.
+
+Тесты не подключаются к рабочей PostgreSQL:
+
+```sh
+python -B -m unittest discover -s backend/tests -v
+```
+
+Подробности серверного MVP, проверки API и подключение ML: [инструкция backend](docs/BACKEND_MVP.md).
+
+## Backend с нуля и интеграция ML
+
+Нужны Python 3.11, Docker Compose и разрешённые локальные CSV. Приватность
+репозитория и доступ жюри проверяются отдельно; CSV нельзя публиковать в публичном
+репозитории. Их фактические пути защищены .gitignore.
+
+После настройки .env установите зависимости в активированное окружение:
+
+```sh
+python -m pip install -r backend/requirements-dev.txt
+```
+
+Версии зафиксированы в requirements.txt/requirements.lock. Используются существующие
+POSTGRES_HOST/PORT/DB/USER/PASSWORD либо приоритетный DATABASE_URL. В Docker backend
+получает host=db, port=5432 и отдельный DOCKER_DATABASE_URL, если он задан. Локальный
+DATABASE_URL намеренно не переносится в контейнер. Пользователь/база/внешний порт db
+настраиваются через env. Не меняйте пароль уже созданного volume одним редактированием env:
+это не меняет пароль самой существующей БД.
+
+**Следующие команды создают таблицы и загружают данные. Они приведены как инструкция;
+для рабочей БД нужны отдельное разрешение и резервная копия. Автоматически они не запускались.**
+
+```sh
+# Запуск PostgreSQL (не удаляет volumes).
+docker compose up -d db
+# Первый запуск схем в выбранной базе:
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < backend/db/schema.sql
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < backend/db/mvp.sql
+# Если прежняя MVP-схема уже создавалась: сначала upgrade_mvp_v2.sql, затем текущий mvp.sql.
+# Старые completed-результаты отдельно проверить на новый DTO statements/sources.
+```
+
+CSV поместите непосредственно в data/ с именами, указанными в разделе импорта.
+Для локальной загрузки используйте `python backend/scripts/import_csv.py`. По умолчанию
+заполненные таблицы не очищаются; --replace явно заменяет три исходные таблицы.
+Демонстрационные новости: `python backend/scripts/seed_demo_news.py`; скрипт пишет
+только синтетические данные, повторный запуск не создаёт копии. Для рабочей БД его
+запуск также требует разрешения. После замены raw-данных старые анализы не удаляются;
+их актуальность нужно проверить отдельно.
+
+```sh
+# Локальный API:
+python -m uvicorn app.api.main:app --app-dir backend --reload
+# Либо весь стек после подготовки базы:
+docker compose up --build -d
+```
+
+Swagger: http://localhost:8000/docs. Без данных работает roles; остальные сценарии
+требуют подготовленной БД. По умолчанию выбран CLIENT U_81, он подтверждён в исходных
+данных; разрешённые CLIENT-ID перечисляются в DEMO_COMPANY_IDS. Заголовок X-Company-ID
+выбирает компанию из этого списка. Это демо-контекст, не авторизация пользователя.
+
+```sh
+curl 'http://localhost:8000/api/v1/companies/U_81'
+curl 'http://localhost:8000/api/v1/demo-profiles'
+curl 'http://localhost:8000/api/v1/feed?company_id=U_81&role=cfo&limit=20&offset=0'
+curl 'http://localhost:8000/api/v1/my-analyses?company_id=U_81&role=cfo&tab=attention&status=completed'
+```
+
+Вкладки сохранённых разборов: all=«Все», ready=«Готовые», processing=«В обработке»,
+attention=«Требуют внимания». Последняя фильтрует importance important/critical,
+не status failed. Это соглашение ожидает подтверждения команды. Status и importance
+можно комбинировать, повторяя параметры в query. null не считается важным.
+
+POST /api/v1/analyses принимает company_id/role/news_id, создаёт запись и возвращает
+202/queued. После подключения ML конечный обработчик запускается отдельно:
+
+```sh
+python backend/scripts/process_analyses.py --limit 5
+```
+
+Жизненный цикл: queued → running → completed/failed. Без ML задача остаётся queued,
+result=null; фиктивных успешных результатов нет. GET /analyses/{id} отдаёт безопасный
+error_code при failed. Повтор: --analysis-id ID --retry --company-id U_81, только
+failed/просроченная running в пределах лимита. См. [интерфейс ML](docs/ML_INTEGRATION.md).
+Автоматической бесконечной очереди при запуске API нет.
+
+Feed принимает готовые оценки ML и сортирует их до пагинации. Пока их нет,
+ranking_mode=chronological и relevance_score=null — это ещё не персональное ранжирование.
+Материалы содержат дисклеймер об отсутствии индивидуальной инвестрекомендации.
+Чат без ML сохраняет вопрос и отвечает 503; передавайте Idempotency-Key, чтобы
+повтор с тем же текстом не дублировал сообщение. Без ключа повторы не объединяются.
+
+```sh
+# Unit/mock без рабочей базы:
+python -B -m unittest discover -s backend/tests -v
+# 8 интеграционных сценариев в отдельном временном PostgreSQL без TCP/volumes:
+POSTGRES_TEST_BIN=/opt/homebrew/opt/postgresql@16/bin python -B backend/scripts/run_integration_tests.py
+```
+
+Для Linux задайте каталог PostgreSQL 16 с initdb/pg_ctl или добавьте его в PATH.
+Тестовый runner печатает отдельную цель, проверяет data_directory/имя базы и удаляет
+только свои временные ресурсы после остановки. Не указывайте рабочую БД для тестов.
+Подробности и ограничения: [Backend MVP](docs/BACKEND_MVP.md).
 
 ## 🌍 Доступные сервисы
 

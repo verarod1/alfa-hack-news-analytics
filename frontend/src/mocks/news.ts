@@ -101,7 +101,7 @@ export function mockNews(newsId: string): NewsDetail {
     text: item.short_insight ?? 'Текст новости пока недоступен.',
     published_at: item.published_at,
     source: item.source,
-    created_at: item.published_at,
+    created_at: item.published_at ?? new Date(0).toISOString(),
   };
 }
 
@@ -119,8 +119,8 @@ export function mockAnalysis(analysisId: string, companyId: string, role: string
     result: {
       what_happened: item.title,
       why_important: concern,
-      impact_type: item.impact_type,
-      impact_level: item.impact_level,
+      impact_type: item.impact_type ?? 'neutral',
+      impact_level: item.impact_level ?? 'unknown',
       importance: 'important',
       confidence: 'medium',
       company_factors: company ? [
@@ -130,11 +130,11 @@ export function mockAnalysis(analysisId: string, companyId: string, role: string
           : []),
       ] : [],
       analyzed_news_ids: [item.id],
-      risks: item.impact_type === 'risk' ? [{ id: `risk_${item.id}`, text: concern, severity: item.impact_level, evidence_ids: [`e_${item.id}`] }] : [],
-      opportunities: item.impact_type === 'opportunity' ? [{ id: `opportunity_${item.id}`, text: concern, severity: item.impact_level, evidence_ids: [`e_${item.id}`] }] : [],
+      risks: item.impact_type === 'risk' ? [{ id: `risk_${item.id}`, text: concern, severity: item.impact_level ?? 'unknown', evidence_ids: [`e_${item.id}`] }] : [],
+      opportunities: item.impact_type === 'opportunity' ? [{ id: `opportunity_${item.id}`, text: concern, severity: item.impact_level ?? 'unknown', evidence_ids: [`e_${item.id}`] }] : [],
       bank_opinion: null,
       recommended_actions: [{ text: item.impact_type === 'risk' ? 'Проверьте влияние возможных изменений на текущие планы и договоры.' : 'Проверьте спрос, доступные мощности и потребность в оборотных средствах.', basis_ids: [item.impact_type === 'risk' ? `risk_${item.id}` : `opportunity_${item.id}`] }],
-      sources: [{ id: `e_${item.id}`, type: 'news', title: item.title, url: item.source.url, published_at: item.published_at }],
+      sources: [{ id: `e_${item.id}`, type: 'news', title: item.title, ...(item.source.url ? { url: item.source.url } : {}), ...(item.published_at ? { published_at: item.published_at } : {}) }],
       limitations: ['Демонстрационные данные. Вывод требует проверки по реальным источникам.'],
     },
   };

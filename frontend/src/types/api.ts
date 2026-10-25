@@ -3,13 +3,14 @@
 export type ClientType = 'CLIENT' | 'PROSPECT' | 'CLOSE_CLIENT';
 
 export interface Industry {
-  code: string;
-  name: string;
+  code: string | null;
+  name: string | null;
 }
 
 export interface Revenue {
-  value: number;
+  value: number | null;
   unit: string;
+  year?: number;
 }
 
 export interface ForeignTrade {
@@ -34,19 +35,19 @@ export interface CompanyProfile {
   id: string;
   company_name: string;
   industry: Industry;
-  region: string;
+  region: string | null;
   city: string | null;
   age_range: string | null;
   employees_range: string | null;
   business_stage: string | null;
-  client_type: ClientType;
+  client_type: ClientType | null;
   revenue: Revenue;
   foreign_trade: ForeignTrade;
   bank_products: BankProducts;
   group_id: string | null;
   organization_type: string | null;
   ownership_form: string | null;
-  key_owner_flag: string | boolean | null;
+  key_owner_flag: boolean | null;
   employees_spark_range: string | null;
 }
 
@@ -98,25 +99,29 @@ export type ImpactLevel = 'low' | 'medium' | 'high' | 'unknown';
 export type AnalysisStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface NewsSource {
-  id: string;
-  name: string;
-  url: string;
+  id: string | null;
+  name: string | null;
+  url: string | null;
 }
 
 export interface FeedItem {
   id: string;
   title: string;
-  published_at: string;
+  published_at: string | null;
   source: NewsSource;
-  relevance_score: number;
-  impact_type: ImpactType;
-  impact_level: ImpactLevel;
+  is_synthetic?: boolean;
+  relevance_score: number | null;
+  impact_type: ImpactType | null;
+  impact_level: ImpactLevel | null;
   short_insight: string | null;
   relevance_reasons: string[];
   analysis_id: string | null;
 }
 
 export interface FeedResponse {
+  disclaimer?: string;
+  ranking_mode?: 'chronological' | 'relevance';
+  scored_total?: number;
   items: FeedItem[];
   total: number;
   limit: number;
@@ -124,7 +129,7 @@ export interface FeedResponse {
 }
 
 export interface NewsDetail extends Pick<FeedItem, 'id' | 'title' | 'published_at' | 'source'> {
-  text: string;
+  text: string | null;
   created_at: string;
 }
 
@@ -133,12 +138,13 @@ export interface AnalysisResult {
   why_important: string;
   impact_type: ImpactType;
   impact_level: ImpactLevel;
-  importance: string;
-  confidence: string;
+  importance: string | null;
+  confidence: string | null;
+  statements?: { field: string; text: string; statement_type: string; evidence_ids: string[] }[];
   company_factors: { field: string; value: string | number | boolean | null; impact: string }[];
   analyzed_news_ids: string[];
-  risks: { id: string; text: string; severity: string; evidence_ids: string[] }[];
-  opportunities: { id: string; text: string; severity: string; evidence_ids: string[] }[];
+  risks: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type?: string }[];
+  opportunities: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type?: string }[];
   bank_opinion: { text: string; document_id: string; page: number; quote: string; evidence_ids: string[] } | null;
   recommended_actions: { text: string; basis_ids: string[] }[];
   sources: Array<{
@@ -162,6 +168,9 @@ export interface AnalysisResponse {
   news_id: string;
   role: string;
   result: AnalysisResult | null;
+  error_code?: string | null;
+  attempt_count?: number;
+  disclaimer?: string;
 }
 
 export interface StartAnalysisResponse {
@@ -186,7 +195,8 @@ export interface AnalysisTrace {
     status: AnalysisStatus;
     model: string | null;
     tool: string | null;
-    summary: string;
+    summary: string | null;
+    attempt?: number;
     source_ids: string[];
     validation: { performed: boolean; passed: boolean | null };
   }>;

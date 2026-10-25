@@ -116,6 +116,12 @@ export function BankHome({ session, onOpenAnalytics, onChangeProfile, onChangeRo
           {tasks.map((item) => <div className="bank-home-task" key={item.label}><span>{item.label}</span><strong className={item.urgent ? 'is-urgent' : ''}>{item.count}</strong></div>)}
         </section>
 
+        <section className="bank-home-analytics-card" aria-labelledby="bank-home-analytics-title">
+          <span className="bank-home-analytics-mark" aria-hidden="true">✦</span>
+          <div><span className="bank-home-analytics-eyebrow">НОВОСТИ ДЛЯ ВАШЕГО БИЗНЕСА</span><h2 id="bank-home-analytics-title">Персональная аналитика</h2><p>Риски и возможности с учётом вашей компании и роли</p></div>
+          <button type="button" onClick={onOpenAnalytics}>Перейти к новостям <span aria-hidden="true">→</span></button>
+        </section>
+
         <div className="bank-home-summary">
           <section className="bank-home-account-card" aria-label="Демонстрационный вид счёта">
             <div className="bank-home-balance">
@@ -133,12 +139,6 @@ export function BankHome({ session, onOpenAnalytics, onChangeProfile, onChangeRo
             <div className="bank-home-promo bank-home-promo-peach"><strong>Деньги сверху</strong><p>Бонусы за привычные операции</p><span aria-hidden="true">✦</span></div>
           </aside>
         </div>
-
-        <section className="bank-home-analytics-card" aria-labelledby="bank-home-analytics-title">
-          <span className="bank-home-analytics-mark" aria-hidden="true">✦</span>
-          <div><span className="bank-home-analytics-eyebrow">НОВОСТИ ДЛЯ ВАШЕГО БИЗНЕСА</span><h2 id="bank-home-analytics-title">Персональная аналитика</h2><p>Риски и возможности с учётом вашей компании и роли</p></div>
-          <button type="button" onClick={onOpenAnalytics}>Перейти к новостям <span aria-hidden="true">→</span></button>
-        </section>
 
         <section className="bank-home-operations" aria-labelledby="bank-home-operations-title">
           <div className="bank-home-operations-head"><h2 id="bank-home-operations-title">История операций</h2><span aria-hidden="true">⌃</span></div>
