@@ -44,12 +44,12 @@ Swagger: `http://localhost:8000/docs`, схема: `/openapi.json`.
 автоматически ни при сборке, ни при старте приложения.
 
 ```bash
-docker compose exec backend python scripts/rank_news.py --company-id U_81 --role cfo --limit 3
+docker compose exec backend python scripts/rank_news.py --company-id U_44564 --role cfo --limit 3
 # POST /api/v1/analyses возвращает analysis_id и queued. Затем:
 docker compose exec backend python scripts/process_analyses.py --limit 3
 ```
 
-`GET /api/v1/feed?company_id=U_81&role=cfo` показывает сохранённые оценки.
+`GET /api/v1/feed?company_id=U_44564&role=cfo` показывает сохранённые оценки.
 Без оценок лента честно возвращает `ranking_mode=chronological` и `null`.
 Фильтр `impact_type` использует завершённый анализ: оценка релевантности сама по
 себе не доказывает наличие риска или возможности.
