@@ -1,4 +1,4 @@
-"""Only the three official sources reviewed for this MVP. No arbitrary URL input."""
+"""Reviewed source registry. No arbitrary URL input or bypass of source restrictions."""
 
 import hashlib
 import re
@@ -21,6 +21,7 @@ class Source:
     feed_url: str
     hosts: tuple[str, ...]
     article_pattern: str
+    collection_allowed: bool = True
 
     def url(self, value, *, feed=False):
         try:
@@ -58,6 +59,16 @@ SOURCES = {
     "cbr": Source(
         "cbr", "Банк России", "https://www.cbr.ru/rss/RssPress",
         ("www.cbr.ru", "cbr.ru"), r"/press/(?:PR|pr|event)/?",
+    ),
+    "interfax": Source(
+        "interfax", "Интерфакс", "https://www.interfax.ru/rss",
+        ("www.interfax.ru", "interfax.ru"), r"/(?:business|russia|world|digital)/\d+/?",
+        collection_allowed=False,
+    ),
+    "finmarket": Source(
+        "finmarket", "Финмаркет", "https://www.finmarket.ru/rss/mainnews.asp",
+        ("www.finmarket.ru", "finmarket.ru"), r"/(?:main/article|news)/\d+/?",
+        collection_allowed=False,
     ),
     "minfin": Source(
         "minfin", "Минфин России", "https://minfin.gov.ru/rss_news?mod=news&lim=50",

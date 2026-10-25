@@ -1,6 +1,7 @@
 """Strict bounded RSS parsing without DTD/entities or naive publication times."""
 
 import xml.etree.ElementTree as ET
+import re
 from datetime import timezone
 from email.utils import parsedate_to_datetime
 
@@ -17,8 +18,10 @@ def rss_items(body):
     if b"<!doctype" in declarations or b"<!entity" in declarations:
         raise CollectionError("UNSAFE_XML")
     try:
-        root = ET.fromstring(body)
-    except (ET.ParseError, ValueError):
+        # Expat does not support every single-byte XML encoding as raw bytes.
+        declaration = re.search(br"encoding=[\"'](windows-1251|cp1251)[\"']", body[:200], re.I)
+        root = ET.fromstring(body.decode("cp1251") if declaration else body)
+    except (ET.ParseError, ValueError, LookupError):
         raise CollectionError("INVALID_XML") from None
     for node in root.iter():
         node.tag = node.tag.rsplit("}", 1)[-1]
