@@ -27,6 +27,10 @@ def collect(source_codes, settings, *, limit=None, dry_run=False, keywords=(), m
         result = {"source": code, "inspected": 0, "filtered": 0, "accepted": 0,
                   "stored_or_existing": 0, "conflicts": 0, "errors": [], "warnings": [], "items": []}
         report["sources"].append(result)
+        if not source.collection_allowed:
+            result["errors"].append({"code": "SOURCE_RIGHTS_REQUIRED", "http_status": None, "retry_after": None})
+            result["warnings"].append("RSS availability does not grant storage/republication rights; source skipped")
+            continue
         try:
             feed_url = getattr(settings, "news_" + code + "_rss_url")
             response = client.get(feed_url, source, feed=True)

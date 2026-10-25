@@ -123,7 +123,8 @@ class PostgreSQLTests(TestCase):
 
         fixtures = Path(__file__).parent / "fixtures" / "news"
         ids = []
-        for code, source in SOURCES.items():
+        for code in ("cbr", "minfin", "fns"):
+            source = SOURCES[code]
             body = (fixtures / (code + ".xml")).read_bytes()
             def client_for_feed(xml):
                 client = Mock(spec=NewsHTTPClient)

@@ -41,7 +41,7 @@ class CollectorTests(TestCase):
 
     def test_three_sources_normalize_and_dry_run_never_writes(self):
         with patch('app.parsers.collector.news_service.save_news') as save:
-            for code in SOURCES:
+            for code in ("cbr", "minfin", "fns"):
                 with self.subTest(code=code):
                     report = collect([code], self.settings, dry_run=True, now=NOW, client=self.client(code))
                     item = report['sources'][0]['items'][0]
