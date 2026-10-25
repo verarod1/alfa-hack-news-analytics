@@ -47,7 +47,7 @@ services:
       MAX_ANALYSIS_ATTEMPTS: ${MAX_ANALYSIS_ATTEMPTS:-3}
       ANALYSIS_LEASE_SECONDS: ${ANALYSIS_LEASE_SECONDS:-900}
       BANK_MATERIALS_PATH: ${BANK_MATERIALS_PATH:-}
-      DATA_DIR: /app/data
+      DATA_DIR: ${DOCKER_DATA_DIR:-/app/data/raw}
     volumes:
       - ./data:/app/data:ro
     ports:

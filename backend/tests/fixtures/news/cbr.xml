@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Тестовая RSS фикстура ЦБ</title>
+<item><title>[ТЕСТ XML] Условия финансирования бизнеса</title>
+<link>https://www.cbr.ru/press/PR/?file=test-fixture.htm</link>
+<guid>fixture-cbr</guid><pubDate>Sat, 24 Oct 2026 12:00:00 +0300</pubDate>
+<description><![CDATA[<p>Это синтетический текст XML фикстуры, а не публикация Банка России. Он проверяет получение и сохранение достаточно длинного текста новости.</p><p>Условия финансирования используются только как учебный сценарий для изолированных тестов сервиса.</p><script>unwanted_script()</script>]]></description></item>
+</channel></rss>
