@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     max_analysis_attempts: int = Field(default=3, ge=1, le=10)
     analysis_lease_seconds: int = Field(default=900, ge=60, le=86400)
     bank_materials_path: str = ""
+    news_sources: str = "cbr,minfin,fns"
+    news_cbr_rss_url: str = "https://www.cbr.ru/rss/RssPress"
+    news_minfin_rss_url: str = "https://minfin.gov.ru/rss_news?mod=news&lim=50"
+    news_fns_rss_url: str = "https://www.nalog.gov.ru/rn77/rss/"
+    news_limit: int = Field(default=10, ge=1, le=100)
+    news_timeout_seconds: int = Field(default=20, ge=1, le=60)
+    news_max_response_bytes: int = Field(default=2_000_000, ge=1000, le=5_000_000)
+    news_user_agent: str = Field(default="AlfaHackNewsCollector/1.0", min_length=5, max_length=200, pattern=r"^[\x20-\x7e]+$")
+    news_request_delay_seconds: float = Field(default=1.0, ge=1, le=60)
+    news_max_age_days: int = Field(default=30, ge=0, le=3650)
+    news_min_text_chars: int = Field(default=120, ge=40, le=1000)
+    news_keywords: str = ""
 
     def company_ids(self):
         return tuple(

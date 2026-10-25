@@ -35,3 +35,8 @@ data/**/*.csv
 
 # Локальные доверенные тексты банковских материалов
 data/bank_materials/
+# Банковские PDF и создаваемые ML-артефакты остаются локально.
+data/raw/bank_analytics/
+data/chroma_db/
+data/rag_cache/
+data/ocr_cache/
