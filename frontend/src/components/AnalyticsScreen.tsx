@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { getAnalysisForNews, getAnalysisStatus, getAnalysisTrace, getChatHistory, getFeed, getNews, getRoles, isMockApi, recalculateAnalysis, retryFailedAnalysis, sendChatMessage } from '../api/service';
 import type { AnalysisResponse, AnalysisResult, AnalysisStatus, AnalysisTrace, ChatMessage, CompanyProfile, FeedItem, NewsDetail, RoleItem, StatementType } from '../types/api';
 import { loadDemoConversation, saveDemoConversation } from '../utils/demoStorage';
+import { newRequestKey } from '../utils/requestKey';
 
 interface Props {
   session: { company: CompanyProfile; roleCode: string; roleName: string };
@@ -354,7 +355,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
     const requestId = detailRequest.current;
     const signal = detailAbort.current.signal;
     if (pendingRecalculation.current?.newsId !== selected.id) {
-      pendingRecalculation.current = { newsId: selected.id, key: crypto.randomUUID() };
+      pendingRecalculation.current = { newsId: selected.id, key: newRequestKey() };
     }
     setRecalculateLoading(true);
     setStatusError(null);
@@ -402,7 +403,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
     const sentQuestion = question.trim();
     const requestId = detailRequest.current;
     if (pendingQuestion.current?.analysisId !== analysis.analysis_id || pendingQuestion.current.message !== sentQuestion) {
-      pendingQuestion.current = { analysisId: analysis.analysis_id, message: sentQuestion, key: crypto.randomUUID() };
+      pendingQuestion.current = { analysisId: analysis.analysis_id, message: sentQuestion, key: newRequestKey() };
     }
     const requestKey = pendingQuestion.current.key;
     setChatLoading(true);
@@ -536,6 +537,7 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
               >{tab.label}</button>)}
             </div>
             <div id="detail-panel-analysis" role="tabpanel" aria-labelledby="detail-tab-analysis" hidden={detailTab !== 'analysis'}>
+              {analysis?.status === 'completed' && <div className="detail-section"><h3>Статус разбора</h3><p role="status">Разбор готов.</p>{!isMockApi && <><p>Если данные компании или материалы банка изменились, можно рассчитать новый результат.</p><button type="button" className="detail-refresh" disabled={recalculateLoading} onClick={() => void recalculateCurrentAnalysis()}>{recalculateLoading ? 'Запускаем…' : 'Пересчитать разбор'}</button>{statusError && <p role="alert">{statusError}</p>}</>}</div>}
               <div className="detail-section"><h3>Что произошло</h3><p>{analysis?.result?.what_happened ?? news.text ?? 'Текст новости недоступен.'}</p>{analysis?.result ? <><span className="detail-claim-type">{statementLabel[analysis.result.statements.find((statement) => statement.field === 'what_happened')?.statement_type ?? 'fact']}</span><EvidenceLinks ids={analysis.result.statements.find((statement) => statement.field === 'what_happened')?.evidence_ids ?? []} sources={analysis.result.sources} /></> : null}</div>
               {analysis?.result ? <>
                 <div className="detail-section"><h3>Почему это важно для компании</h3><p>{analysis.result.why_important}</p><span className="detail-claim-type">{statementLabel[analysis.result.statements.find((statement) => statement.field === 'why_important')?.statement_type ?? 'model_inference']}</span><EvidenceLinks ids={analysis.result.statements.find((statement) => statement.field === 'why_important')?.evidence_ids ?? []} sources={analysis.result.sources} /></div>
@@ -547,9 +549,8 @@ export function AnalyticsScreen({ session, onExit, onHome, onChangeRole, themeCo
                 <div className="detail-section detail-recommendations"><h3>Возможные действия</h3>{analysis.result.recommended_actions.length ? <ul>{analysis.result.recommended_actions.map((action, index) => <li key={index}>{action.text}<span className="detail-evidence">Основание: {action.basis_ids.map((id) => [...analysis.result!.risks, ...analysis.result!.opportunities].find((finding) => finding.id === id)?.text ?? id).join('; ')}</span></li>)}</ul> : <p>Обоснованных действий пока нет.</p>}</div>
                 <div className="detail-section"><h3>Источники и ограничения</h3><ul>{analysis.result.sources.map((source) => <li key={source.id}>{source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title ?? source.document_title ?? source.url}</a> : source.title ?? source.document_title ?? source.id}{source.page ? `, стр. ${source.page}` : ''}{source.quote && <span className="detail-evidence">Цитата: «{source.quote}»</span>}</li>)}{analysis.result.limitations.map((limitation, index) => <li key={`limit_${index}`}>{limitation}</li>)}</ul></div>
                 {trace && <details className="detail-section detail-trace"><summary>Как получен вывод</summary><ol>{trace.steps.map((step) => <li key={`${step.attempt ?? 1}_${step.order}`}><strong>{step.name}</strong> · {step.status}{step.tool ? ` · ${step.tool}` : ''}{step.model ? ` · ${step.model}` : ''}{step.summary ? <span className="detail-trace-summary">{step.summary}</span> : null}<EvidenceLinks ids={step.source_ids} sources={analysis.result!.sources} />{step.validation.performed && <span className="detail-evidence">Проверка: {step.validation.passed ? 'пройдена' : 'не пройдена'}</span>}</li>)}</ol></details>}
-                {!isMockApi && <div className="detail-section"><h3>Обновить разбор</h3><p>Если данные компании или материалы банка изменились, можно рассчитать новый результат. Запрос использует ML-сервис.</p><button type="button" className="detail-refresh" disabled={recalculateLoading} onClick={() => void recalculateCurrentAnalysis()}>{recalculateLoading ? 'Запускаем…' : 'Пересчитать разбор'}</button>{statusError && <p role="alert">{statusError}</p>}</div>}
                 {analysis.disclaimer && <p className="detail-disclaimer">{analysis.disclaimer}</p>}
-              </> : <div className="detail-section" role="status"><p>{analysis?.status === 'failed' ? 'Обработка завершилась с ошибкой.' : analysis?.status === 'running' ? 'Разбор обрабатывается.' : 'Разбор поставлен в очередь.'}</p>{analysis?.status === 'failed' ? <p>Код ошибки: {analysis.error_code ?? 'не указан'}.</p> : <p>{pollPaused ? 'Автоматическое обновление приостановлено.' : 'Проверяем готовность разбора автоматически.'}</p>}{statusError && <p role="alert">Не удалось проверить статус: {statusError}</p>}{analysis?.status === 'failed' && <button type="button" className="detail-refresh" onClick={() => void retryAnalysis()}>Повторить разбор</button>}<button type="button" className="detail-refresh" onClick={() => void refreshAnalysis()}>Проверить статус</button>{analysis?.disclaimer && <p className="detail-disclaimer">{analysis.disclaimer}</p>}</div>}
+              </> : <div className="detail-section" role="status"><h3>Статус разбора</h3><p>{analysis?.status === 'failed' ? 'Обработка завершилась с ошибкой.' : analysis?.status === 'running' ? 'Разбор обрабатывается.' : 'Разбор поставлен в очередь.'}</p>{analysis?.status === 'failed' ? <p>Код ошибки: {analysis.error_code ?? 'не указан'}.</p> : <p>{pollPaused ? 'Автоматическое обновление приостановлено.' : 'Проверяем готовность разбора автоматически.'}</p>}{statusError && <p role="alert">Не удалось проверить статус: {statusError}</p>}{analysis?.status === 'failed' && <button type="button" className="detail-refresh" onClick={() => void retryAnalysis()}>Повторить разбор</button>}<button type="button" className="detail-refresh" onClick={() => void refreshAnalysis()}>Проверить статус</button>{analysis?.disclaimer && <p className="detail-disclaimer">{analysis.disclaimer}</p>}</div>}
             </div>
             <div id="detail-panel-chat" role="tabpanel" aria-labelledby="detail-tab-chat" hidden={detailTab !== 'chat'}>
               {analysis?.result && <form className="detail-chat" onSubmit={(event) => void askQuestion(event)}>
