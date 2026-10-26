@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     db_connect_timeout: int = Field(default=10, ge=1, le=60)
     db_statement_timeout_ms: int = Field(default=15000, ge=100, le=120000)
     demo_company_ids: str = "U_44564,U_19717,U_9250"
+    demo_allow_all_clients: bool = False
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     relations_limit: int = Field(default=200, ge=1, le=500)
     ml_adapter_module: str = ""

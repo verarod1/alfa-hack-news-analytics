@@ -5,7 +5,10 @@ from app.services.errors import ServiceError
 
 
 def require_demo_company(company_id):
-    if company_id not in Settings().company_ids():
+    settings = Settings()
+    if settings.demo_allow_all_clients:
+        return require_client_company(company_id)
+    if company_id not in settings.company_ids():
         raise ServiceError(
             403,
             "COMPANY_ACCESS_DENIED",
@@ -19,11 +22,16 @@ def selected_company(
 ):
     """Явный демо-контекст. Это не авторизация пользователя интернет-банка."""
     allowed = Settings().company_ids()
-    if not allowed:
+    settings = Settings()
+    if not settings.demo_allow_all_clients and not allowed:
         raise ServiceError(
             503, "DEMO_NOT_CONFIGURED", "Не настроены демонстрационные компании"
         )
-    company_id = x_company_id or allowed[0]
+    company_id = x_company_id or (allowed[0] if allowed else None)
+    if not company_id:
+        raise ServiceError(
+            400, "COMPANY_REQUIRED", "Укажите компанию в X-Company-ID"
+        )
     require_demo_company(company_id)
     return company_id
 

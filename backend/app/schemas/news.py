@@ -68,6 +68,9 @@ class FeedItem(BaseModel):
     published_at: AwareDatetime | None = None
     source: Source
     is_synthetic: bool
+    topic_label: str
+    excerpt: str | None = None
+    is_archived: bool = False
     relevance_score: float | None = Field(default=None, ge=0, le=1)
     impact_type: ImpactType | None = None
     impact_level: ImpactLevel | None = None
