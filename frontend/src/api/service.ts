@@ -1,5 +1,5 @@
 import type { AnalysisResponse, AnalysisStatus, AnalysisTrace, ChatHistoryResponse, ChatResponse, CompanyProfile, DemoProfilesResponse, FeedResponse, NewsDetail, RolesResponse } from '../types/api';
-import { fetchAnalysis, fetchAnalysisTrace, fetchChatHistory, fetchCompanyById, fetchDemoProfiles, fetchFeed, fetchNews, fetchRoles, postChatMessage, startAnalysis } from './client';
+import { fetchAnalysis, fetchAnalysisTrace, fetchChatHistory, fetchCompanyById, fetchDemoProfiles, fetchFeed, fetchNews, fetchRoles, postChatMessage, retryAnalysis, startAnalysis } from './client';
 import { MOCK_COMPANIES, MOCK_DEMO_PROFILES, MOCK_ROLES } from '../mocks/companies';
 import { mockChatHistory, mockChatMessage } from '../mocks/chat';
 import { mockAnalysis, mockAnalysisTrace, mockFeed, mockNews } from '../mocks/news';
@@ -82,6 +82,16 @@ export async function getAnalysisForNews(
   return response;
 }
 
+// Повторное чтение существующей задачи не создаёт новый анализ.
+export const getAnalysisStatus = fetchAnalysis;
+export async function recalculateAnalysis(companyId: string, role: string, newsId: string, requestKey: string, signal?: AbortSignal): Promise<AnalysisResponse> {
+  if (USE_MOCK_API) throw new Error('Пересчёт доступен только с реальным API.');
+  const started = await startAnalysis(companyId, role, newsId, signal, requestKey);
+  return fetchAnalysis(started.analysis_id, companyId, signal);
+}
+export const retryFailedAnalysis = (analysisId: string, companyId: string, signal?: AbortSignal): Promise<AnalysisResponse> =>
+  USE_MOCK_API ? Promise.reject(new Error('В демонстрационном режиме повтор не нужен.')) : retryAnalysis(analysisId, companyId, signal);
+
 // TODO: Реальный режим вызывает GET /api/v1/analyses/{analysis_id}/trace.
 // Показывайте шаги агентного анализа только после completed; source_ids связывают их с источниками.
 export const getAnalysisTrace = (analysisId: string, companyId: string, signal?: AbortSignal): Promise<AnalysisTrace> =>
@@ -94,7 +104,7 @@ export const getChatHistory = (analysisId: string, companyId: string, limit = 20
 
 // TODO: Реальный режим вызывает POST /api/v1/chat/messages с analysis_id, conversation_id
 // и message. Возвращённый conversation_id передаётся при следующих вопросах.
-export function sendChatMessage(analysisId: string, conversationId: string | null, message: string, companyId: string): Promise<ChatResponse> {
-  if (!USE_MOCK_API) return postChatMessage(analysisId, conversationId, message, companyId);
+export function sendChatMessage(analysisId: string, conversationId: string | null, message: string, companyId: string, requestKey: string): Promise<ChatResponse> {
+  if (!USE_MOCK_API) return postChatMessage(analysisId, conversationId, message, companyId, requestKey);
   return delay(mockChatMessage(analysisId, conversationId, message));
 }

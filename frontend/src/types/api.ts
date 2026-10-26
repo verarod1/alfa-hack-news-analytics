@@ -104,12 +104,25 @@ export interface NewsSource {
   url: string | null;
 }
 
+export type StatementType = 'fact' | 'model_inference' | 'hypothesis';
+
+export interface BankOpinion {
+  text: string;
+  document_id: string;
+  page: number;
+  quote: string;
+  evidence_ids: string[];
+}
+
 export interface FeedItem {
   id: string;
   title: string;
   published_at: string | null;
   source: NewsSource;
   is_synthetic?: boolean;
+  topic_label: string;
+  excerpt: string | null;
+  is_archived: boolean;
   relevance_score: number | null;
   impact_type: ImpactType | null;
   impact_level: ImpactLevel | null;
@@ -131,6 +144,7 @@ export interface FeedResponse {
 export interface NewsDetail extends Pick<FeedItem, 'id' | 'title' | 'published_at' | 'source'> {
   text: string | null;
   created_at: string;
+  is_synthetic: boolean;
 }
 
 export interface AnalysisResult {
@@ -140,12 +154,12 @@ export interface AnalysisResult {
   impact_level: ImpactLevel;
   importance: string | null;
   confidence: string | null;
-  statements?: { field: string; text: string; statement_type: string; evidence_ids: string[] }[];
+  statements: { field: 'what_happened' | 'why_important'; text: string; statement_type: StatementType; evidence_ids: string[] }[];
   company_factors: { field: string; value: string | number | boolean | null; impact: string }[];
   analyzed_news_ids: string[];
-  risks: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type?: string }[];
-  opportunities: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type?: string }[];
-  bank_opinion: { text: string; document_id: string; page: number; quote: string; evidence_ids: string[] } | null;
+  risks: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type: StatementType }[];
+  opportunities: { id: string; text: string; severity: string | null; evidence_ids: string[]; statement_type: StatementType }[];
+  bank_opinion: BankOpinion | null;
   recommended_actions: { text: string; basis_ids: string[] }[];
   sources: Array<{
     id: string;
@@ -185,6 +199,9 @@ export interface ChatResponse {
   answer: string;
   evidence_ids: string[];
   status: AnalysisStatus;
+  statement_type?: 'model_inference' | 'hypothesis';
+  bank_opinion?: BankOpinion | null;
+  disclaimer?: string;
 }
 
 export interface AnalysisTrace {
@@ -207,6 +224,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   evidence_ids?: string[];
+  statement_type?: 'model_inference' | 'hypothesis' | null;
+  bank_opinion?: BankOpinion | null;
   created_at: string;
 }
 
