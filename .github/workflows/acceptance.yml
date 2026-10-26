@@ -1,0 +1,25 @@
+name: Acceptance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start isolated synthetic stack
+        run: docker compose -f compose.review.yml up --build --wait --wait-timeout 180
+      - name: HTTP scenario through nginx
+        run: docker compose -f compose.review.yml --profile check run --rm smoke
+      - name: Install locked test dependency and run unit tests
+        run: docker compose -f compose.review.yml exec -T backend sh -c 'pip install -c requirements.lock httpx2==2.16.0 && python -B -m unittest discover -s tests -v'
+      - name: Logs
+        if: failure()
+        run: docker compose -f compose.review.yml logs --tail=100
+      - name: Stop isolated stack
+        if: always()
+        run: docker compose -f compose.review.yml down

@@ -76,6 +76,7 @@ services:
       - ./data/chroma_db:/app/data/chroma_db:rw
       - ./data/cache:/app/data/cache:rw
       - ./data/ocr_cache:/app/data/ocr_cache:rw
+      - ./data/model_cache:/app/data/model_cache:rw
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
