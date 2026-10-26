@@ -17,6 +17,11 @@ def rank_batch(company_id, role, limit):
     company = require_demo_company(company_id)
     validate_role(role)
     rows, _ = list_news(limit, 0)
+    return rank_rows(company, role, rows)
+
+
+def rank_rows(company, role, rows):
+    company_id = company.id
     saved, errors = [], []
     for row in rows:
         news = news_service.news_response(row)

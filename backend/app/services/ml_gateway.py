@@ -47,7 +47,7 @@ def invoke(operation, context):
             "ML_CONFIG_ERROR",
             "Генеративная модель не входит в согласованный список",
         )
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
     # Значения из .env передаются только процессу адаптера, не в JSON-контекст/ответ API.
     env.update(
         LLM_BASE_URL=settings.llm_base_url,
@@ -74,6 +74,7 @@ def invoke(operation, context):
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
+        encoding="utf-8",
         env=env,
         start_new_session=True,
     )
@@ -84,7 +85,10 @@ def invoke(operation, context):
         )
     except subprocess.TimeoutExpired:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         process.communicate()

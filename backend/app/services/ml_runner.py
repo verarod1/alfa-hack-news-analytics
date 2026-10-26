@@ -8,6 +8,7 @@ import json
 import sys
 import os
 import signal
+from threading import Timer
 
 
 def main():
@@ -18,8 +19,14 @@ def main():
                 os.killpg(os.getpgrp(), signal.SIGKILL)
             os._exit(124)
 
-        signal.signal(signal.SIGALRM, stop_group)
-        signal.alarm(int(os.environ.get("ML_PROCESS_TIMEOUT", "62")))
+        timeout = int(os.environ.get("ML_PROCESS_TIMEOUT", "62"))
+        if os.name == "nt":
+            deadline = Timer(timeout, lambda: os._exit(124))
+            deadline.daemon = True
+            deadline.start()
+        else:
+            signal.signal(signal.SIGALRM, stop_group)
+            signal.alarm(timeout)
         context = json.load(sys.stdin)
         # Логи адаптера не становятся JSON-ответом и не возвращаются клиенту.
         with contextlib.redirect_stdout(sys.stderr):
