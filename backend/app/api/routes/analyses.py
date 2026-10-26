@@ -32,6 +32,11 @@ def get_analysis(analysis_id: str, company_id: str = Depends(selected_company)):
     return analysis_service.get_analysis(analysis_id, company_id)
 
 
+@router.post("/analyses/{analysis_id}/retry", response_model=AnalysisResponse)
+def retry_analysis(analysis_id: str, company_id: str = Depends(selected_company)):
+    return analysis_service.retry_analysis(analysis_id, company_id)
+
+
 @router.get("/analyses/{analysis_id}/trace", response_model=TraceResponse)
 def get_trace(analysis_id: str, company_id: str = Depends(selected_company)):
     return analysis_service.get_trace(analysis_id, company_id)

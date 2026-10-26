@@ -1,111 +1,63 @@
+/* src/index.css */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --bg-page: #f5f6f7;
+  --bg-card: #ffffff;
+  --bg-input: #f3f4f5;
+  --border-color: #e4e5e8;
+  --border-hover: #bfc1c6;
+  --accent-red: #EF3124;
+  --accent-red-hover: #D92B1E;
+  --text-primary: #24262b;
+  --text-secondary: #70737b;
+  --badge-bg: rgba(239, 49, 36, 0.12);
+  --badge-border: rgba(239, 49, 36, 0.45);
+  --badge-text: #bc2a21;
+  --btn-secondary-bg: #ecedef;
+  --btn-secondary-hover: #e0e1e4;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+:root[data-theme='dark'] {
+  --bg-page: #111214;
+  --bg-card: #1d1e21;
+  --bg-input: #25262a;
+  --border-color: #34363b;
+  --border-hover: #55575e;
+  --text-primary: #f5f5f6;
+  --text-secondary: #a8aab1;
+  --badge-text: #ff837a;
+  --btn-secondary-bg: #2b2d31;
+  --btn-secondary-hover: #3b3d42;
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: none; min-height: 39px; padding: 7px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-card); color: var(--text-primary); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.theme-toggle:hover { border-color: var(--accent-red); }
+.theme-toggle span:first-child { color: var(--accent-red); font-size: 19px; line-height: 1; }
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-}
-
-body {
   margin: 0;
+  padding: 0;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+html,
+body,
+#root {
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
 }

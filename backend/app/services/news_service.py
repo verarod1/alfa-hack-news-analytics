@@ -7,6 +7,38 @@ from app.services.company_service import require_client_company
 from app.services.profile_service import validate_role
 from app.services.errors import ServiceError
 
+ARCHIVE_NOTICE = "Это архивная публикация - она может содержать устаревшую информацию."
+TOPICS = (
+    (("ключевую ставку", "ключевой ставк"), "Ключевая ставка"),
+    (("налог", "налогоплательщик"), "Налоги"),
+    (("инсайдер", "акци", "бирж"), "Финансовый рынок"),
+    (("лицензи", "банк", "нко"), "Банковский сектор"),
+    (("перевоз", "логист"), "Логистика"),
+)
+
+
+def news_topic(title: str) -> str:
+    normalized = title.casefold()
+    return next(
+        (label for keywords, label in TOPICS if any(word in normalized for word in keywords)),
+        "Деловые события",
+    )
+
+
+def news_excerpt(text: str | None) -> tuple[str | None, bool]:
+    if not text or not text.strip():
+        return None, False
+    normalized = " ".join(text.split())
+    archived = normalized.startswith(ARCHIVE_NOTICE)
+    if archived:
+        normalized = normalized[len(ARCHIVE_NOTICE):].strip()
+    if not normalized:
+        return None, archived
+    if len(normalized) <= 230:
+        return normalized, archived
+    end = normalized.rfind(" ", 0, 230)
+    return normalized[:end if end > 160 else 230].rstrip(" ,;:") + "…", archived
+
 
 def news_response(row):
     return NewsResponse.model_validate(
@@ -78,6 +110,7 @@ def get_feed(company_id, role, impact_type, limit, offset):
     items = []
     for row in rows:
         news = news_response(row)
+        excerpt, archived = news_excerpt(news.text)
         result = row.get("result") or {}
         items.append(
             {
@@ -86,6 +119,9 @@ def get_feed(company_id, role, impact_type, limit, offset):
                 "published_at": news.published_at,
                 "source": news.source,
                 "is_synthetic": news.is_synthetic,
+                "topic_label": news_topic(news.title),
+                "excerpt": excerpt,
+                "is_archived": archived,
                 "relevance_score": row.get("score"),
                 "impact_type": result.get("impact_type"),
                 "impact_level": result.get("impact_level"),

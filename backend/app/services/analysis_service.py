@@ -87,7 +87,7 @@ def retry_analysis(analysis_id, company_id):
             "RETRY_NOT_ALLOWED",
             "Повтор допускается только для failed/просроченной running в пределах лимита",
         )
-    return row
+    return get_analysis(analysis_id, company_id)
 
 
 def process_analysis(analysis_id):
