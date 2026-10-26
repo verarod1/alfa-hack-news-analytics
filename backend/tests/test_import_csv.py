@@ -122,6 +122,12 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(self.cursor.copy.call_count, 3)
         self.transaction.__exit__.assert_called_once_with(None, None, None)
 
+    def test_import_timeout_is_transaction_local(self):
+        with patch.dict(imp.os.environ, {'IMPORT_STATEMENT_TIMEOUT_MS': '600000'}):
+            imp.run_import(self.connection)
+        self.connection.execute.assert_called_once_with(
+            "SELECT set_config('statement_timeout', %s, true)", ('600000',))
+
 
 if __name__ == '__main__':
     unittest.main()
