@@ -1,300 +1,73 @@
-# 🚀 Новостная аналитика Альфа-Банка (Alfa Hack 2026)
+# Новостная аналитика — Alfa Hack 2026
 
-В репозитории есть frontend, backend и ML-адаптер. Docker Compose запускает PostgreSQL, API, frontend и обработчик очереди анализов. Доступность источников и проверки сборщика описаны в [инструкции](docs/NEWS_COLLECTOR.md).
+Сервис подбирает новости для компании и роли CEO/CFO, сохраняет разбор рисков и возможностей, источники и чат. Реальный AI работает через `team_ml.adapter` и внешний LLM; банковские PDF подключаются через локальный RAG. Материалы не являются индивидуальной инвестиционной рекомендацией.
 
-## 🛠 Как запустить проект у себя
+## Проверка из чистого checkout
 
-1. **Склонируйте репозиторий:**
-   ```bash
-   git clone https://github.com/verarod1/alfa-hack-news-analytics.git
-   cd alfa-hack-news-analytics
-    ```
+Нужны Git, Docker с Linux containers, Compose v2 с `--wait`, интернет для сборки и свободные порты 3100/8100. Python и Node на компьютере не нужны. Сборка содержит тяжёлые ML-зависимости; закладывайте несколько ГБ диска и памяти.
 
-2. **Настройте переменные окружения:**
-Никогда не пушьте ключи в GitHub! Скопируйте шаблон:
-    ```bash
-    cp .env.example .env
-    ```
+```sh
+git clone https://github.com/verarod1/alfa-hack-news-analytics.git
+cd alfa-hack-news-analytics
+docker compose -f compose.review.yml up --build --wait --wait-timeout 180
+docker compose -f compose.review.yml --profile check run --rm smoke
+```
 
+Откройте http://localhost:3100/demo. Swagger: http://localhost:8100/docs. OpenAPI: http://localhost:8100/openapi.json.
 
-Откройте `.env` и задайте непустой `POSTGRES_PASSWORD`. ML пока отключён: ключ и Base URL заполняются только при подключении адаптера. Не добавляйте `.env` и исходные CSV в Git.
-3. **Запустите всё одной командой:**
-Убедитесь, что Docker Desktop запущен, и выполните:
-```bash
+**Это синтетический технический тест, а не оценка качества AI.** Отдельная БД содержит три искусственные компании, платежи, связи и новости. Тестовый адаптер явно помечает ответы; внешние LLM/RSS не вызываются. `.env`, закрытые CSV и ключи не нужны. Не объединяйте проверочный и обычный Compose. Публичный пароль проверочной БД пригоден только для этого локального окружения.
+
+Учётные записи не нужны: выберите `U_44564`, `U_19717` или `U_9250`, затем CEO/CFO. Это демо-контекст, не пользовательская аутентификация.
+
+Проверка: [ACCEPTANCE](docs/ACCEPTANCE.md). Остановка: `docker compose -f compose.review.yml down`. Данные сохраняются в volume. SQL выполняется только при первом создании БД; повторный запуск не мигрирует старую схему. Для нового чистого прогона остановите старый стек и используйте новое имя проекта `-p alfa-review-2` во всех командах.
+
+## Реальные данные и ML
+
+1. Скопируйте `.env.example` в `.env`, задайте `POSTGRES_PASSWORD`. В PowerShell: `Copy-Item .env.example .env`.
+2. Положите разрешённые CSV в `data/raw/`. Формат: [BACKEND_MVP](docs/BACKEND_MVP.md).
+3. Подготовьте **новую** БД и импортируйте данные:
+
+```sh
+docker compose up -d db
+docker compose cp backend/db/schema.sql db:/tmp/schema.sql
+docker compose cp backend/db/mvp.sql db:/tmp/mvp.sql
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f /tmp/schema.sql -f /tmp/mvp.sql'
+docker compose build backend
+docker compose run --rm backend python scripts/import_csv.py
 docker compose up --build -d
-
 ```
 
-Откройте **http://localhost:3000/demo** (или `http://10.6.7.1:3000/demo` в используемой локальной сети). Адрес с портом 5173 работает только при отдельном запуске Vite. В Compose фиксированы три демо-компании `U_44564`, `U_19717`, `U_9250`, каждая с двумя ролями. PostgreSQL доступна сервисам Compose по `db:5432` и не публикует порт на компьютере; для команд к БД используйте `docker compose exec db psql`.
+Для старой MVP-схемы изучите `backend/db/upgrade_mvp_v2.sql`. Импорт не заменяет заполненные таблицы без явного `--replace`. Не меняйте пароль существующей БД только в `.env`: это не обновляет пароль в PostgreSQL.
 
-При открытии новости API ставит анализ в очередь, а `analysis-worker` выполняет его автоматически, если настроены `ML_ADAPTER_MODULE`, `LLM_BASE_URL` и `LLM_API_KEY`. Реальный запрос к ML может расходовать бюджет. Неуспешный разбор можно повторить кнопкой на экране; автоматических повторов нет. Сбор новостей и предварительное ранжирование остаются отдельными командами. Проверить запуск: `docker compose ps` и `docker compose logs --tail=30 backend analysis-worker`.
+Интерфейс: http://localhost:3000/demo, Swagger: http://localhost:8000/docs. Обычный Compose запускает PostgreSQL, API, frontend, analysis-worker и news-collector. Сборщик зависит от доступности реальных RSS. Сохранённые снимки можно загрузить командой `docker compose exec backend python scripts/import_news_fixtures.py`.
 
-Проверенные PDF банка подключаются по [пошаговому гайду](docs/BANK_PDF_GUIDE.md); после их добавления нужные новости пересчитываются кнопкой в интерфейсе.
+Для настоящего AI задайте `ML_ADAPTER_MODULE=team_ml.adapter`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` и выполните `docker compose up -d`. Анализ и чат передают контекст провайдеру и могут расходовать бюджет. Без адаптера разбор остаётся queued, чат возвращает 503. Ranking-worker включается отдельно: `NEWS_RANK_ENABLED=true` и `docker compose --profile ranking up -d`.
 
+PDF и подготовка RAG: [BANK_PDF_GUIDE](docs/BANK_PDF_GUIDE.md), [README_ML_CORE](docs/README_ML_CORE.md). Индексация также вызывается лениво при поиске; первый запрос может потребовать загрузки embedding-модели, а OCR сканов — внешнего API. Без подтверждённого банковского источника `bank_opinion=null`.
 
+## Конфигурация и архитектура
 
-## 🐍 Настройка локального окружения
+Полный шаблон: [.env.example](.env.example), типы и ограничения: [settings.py](backend/app/settings.py).
 
-Docker запускает код внутри контейнеров, поэтому ваш редактор (VS Code/PyCharm) локально не видит установленные библиотеки и может подчеркивать импорты (например, `fastapi`) желтым цветом.
+- БД: `POSTGRES_*`, приоритетный `DATABASE_URL`; внутри Compose `db:5432`, отдельный URI — `DOCKER_DATABASE_URL`. Порт БД наружу не опубликован.
+- Данные: `DATA_DIR`, `DOCKER_DATA_DIR`, `BANK_PDF_DIR`; кэши: `CHROMA_DB_DIR`, `OCR_CACHE_DIR`, `HF_HOME`.
+- AI: `ML_ADAPTER_MODULE`, `LLM_*`, `EMBEDDING_MODEL`, `RAG_TOP_K`.
+- Новости: `NEWS_SOURCES`, `NEWS_LIMIT`, `NEWS_POLL_SECONDS`, `NEWS_MAX_AGE_DAYS`, `NEWS_KEYWORDS`; синтетика скрыта при `FEED_INCLUDE_SYNTHETIC=false`.
+- Демо и порты: `DEMO_COMPANY_IDS`, `CORS_ORIGINS`, `BACKEND_PORT`, `FRONTEND_PORT`. Обычный Compose фиксирует три ID компаний.
 
-Чтобы включить автодополнение и убрать ошибки в редакторе, настройте виртуальное окружение на своем компьютере:
+React/TypeScript/Vite → nginx → FastAPI → PostgreSQL. Analysis-worker обрабатывает очередь `queued → running → completed/failed`; адаптер ML запускается отдельным процессом с таймаутом. News-collector сохраняет новости, ranking-worker — оценки по компании/роли. Chroma — встроенная файловая БД.
 
-1. **Откройте терминал в корне проекта и создайте окружение:**
-```bash
-python -m venv .venv
+[Архитектура и модель данных](docs/ARCHITECTURE.md), [API](docs/api/API_CONTRACT.md), [компоненты и имитации](THIRD_PARTY_NOTICES.md), [комплект сдачи](SUBMISSION.md).
 
-```
+Python 3.11 в Docker; зависимости закреплены `backend/requirements.txt` и `requirements.lock`. Frontend устанавливается `npm ci` по `frontend/package-lock.json`. Docker-образы используют изменяемые теги; побитовая воспроизводимость и revision embedding-модели пока не зафиксированы.
 
-
-2. **Активируйте его:**
-* Windows: `.\.venv\Scripts\activate`
-* Mac/Linux: `source .venv/bin/activate`
-
-
-3. **Установите зависимости бэкенда локально:**
-```bash
-(cd backend && python -m pip install -r requirements.txt)
-
-```
-
-
-4. В VS Code нажмите `Ctrl+Shift+P` (или `Cmd+Shift+P`), введите `Python: Select Interpreter` и выберите созданное окружение (`'.venv': venv`).
-
-## Импорт CSV в PostgreSQL
-
-Импортёр проверяет три CSV и загружает их в `raw_companies`, `raw_payments`
-и `raw_person_links`. Без аргументов запуск разрешён только при пустых таблицах:
-повторный импорт останавливается без удаления данных и добавления дубликатов.
-При ошибке загрузки изменения откатываются. Схема БД должна быть подготовлена заранее.
-
-Для базы, запущенной текущим Compose, выполняйте импорт внутри backend-контейнера:
-
-В актуальном `.env.example` указан `DATA_DIR=data/raw`: разместите исходные CSV
-в этой папке вручную. Существующие файлы автоматически не перемещаются.
-В Docker путь задаёт `DOCKER_DATA_DIR` (по умолчанию `/app/data/raw`). Если ваш
-набор пока лежит непосредственно в `data/`, сохраните локальный `DATA_DIR=data`,
-а для контейнера задайте `DOCKER_DATA_DIR=/app/data`; `.env` не публикуйте.
-
-```sh
-docker compose exec backend python scripts/import_csv.py
-```
-
-`--replace` нужен для полной перезагрузки: добавьте его к команде запуска.
-**Он заменяет существующие данные трёх таблиц и может временно блокировать чтение.**
-Проверьте целевую базу и сохраните резервную копию перед использованием.
-
-Настройки берутся из окружения или корневого `.env` (окружение имеет приоритет):
-
-- `DATABASE_URL` — строка подключения; имеет приоритет над отдельными параметрами.
-- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` — в Compose
-  используются `db`, `5432` и значения из `.env`; `POSTGRES_PASSWORD` — обязательный пароль.
-- `DATA_DIR` — каталог CSV: по умолчанию `data/`, в Docker — `/app/data`.
-- `DOCKER_DATABASE_URL` — переопределение подключения backend в Compose.
-  Используйте адрес `db:5432` и URL-кодирование специальных символов пароля.
-
-Тесты не подключаются к рабочей PostgreSQL:
-
-```sh
-python -B -m unittest discover -s backend/tests -v
-```
-
-Подробности серверного MVP, проверки API и подключение ML: [инструкция backend](docs/BACKEND_MVP.md).
-
-## Ручной сбор реальных новостей
-
-Проверка без подключения к PostgreSQL и без вызовов ML:
-
-```sh
-python backend/scripts/collect_news.py --source cbr --limit 3 --dry-run
-```
-
-Для сохранения в заранее подготовленную целевую БД уберите `--dry-run`.
-Доступны `--source cbr|minfin|fns|all`, тематический отбор и ограничение давности.
-Сборщик не запускается вместе с FastAPI и не запускает платный AI-анализ.
-Команды Docker, настройки, проверенные ограничения и стыковка с ML:
-[NEWS_COLLECTOR.md](docs/NEWS_COLLECTOR.md).
-
-## Интегрированный сценарий MVP
-
-Импорт больших CSV использует отдельный `IMPORT_STATEMENT_TIMEOUT_MS` (10 минут)
-внутри транзакции: общий 15-секундный лимит API больше не прерывает COPY.
-
-Compose запускает `news-collector`: он периодически сохраняет настоящие публикации
-из `NEWS_SOURCES` в PostgreSQL. Лента читает эту же таблицу и по умолчанию скрывает
-синтетические новости (`FEED_INCLUDE_SYNTHETIC=false`), не удаляя их и связанные анализы.
-Сохранённые публикации из `backend/fixtures/official_news.json` — реальные снимки ФНС,
-а не подтверждение работающего периодического сбора.
-
-Для фонового ранжирования подготовлен `ranking-worker` в Compose-профиле `ranking`.
-По умолчанию он выключен (`NEWS_RANK_ENABLED=false`). Его включение требует согласовать
-передачу текста новости и профиля компании настроенному внешнему LLM-провайдеру.
-После согласования нужны `NEWS_RANK_ENABLED=true` и запуск Compose с `--profile ranking`.
-Обработчик выбирает до `NEWS_RANK_LIMIT` реальных новостей без оценки на каждую
-компанию из `DEMO_COMPANY_IDS` и каждую роль (CEO/CFO), повторяет цикл раз в
-`NEWS_RANK_POLL_SECONDS`. Давность ограничена `NEWS_MAX_AGE_DAYS`.
-Оценённые пары компания/роль/новость повторно не отправляются; неудачные оценки
-повторяются в следующем цикле. До оценки новость уже доступна в ленте без score.
-Одновременно работает один обработчик (advisory lock PostgreSQL).
-
-После загрузки новостей и настройки `ML_ADAPTER_MODULE=team_ml.adapter`:
-
-```sh
-# Ограниченный запуск; с настоящим LLM-ключом расходует бюджет.
-python backend/scripts/rank_news.py --company-id U_81 --role cfo --limit 3
-# При запуске через Compose очередь обрабатывает analysis-worker.
-# Для запуска backend вне Compose доступна ручная команда:
-python backend/scripts/process_analyses.py --limit 3
-```
-
-Ранкер сохраняет оценки отдельно для каждой компании/роли; ошибки не заменяются
-выдуманными числами. RAG и OCR запускаются отдельно, постоянные каталоги состояния
-монтируются для записи, исходные CSV/PDF — только для чтения.
-Команды индексации, конфигурация и ограничения: [Backend + ML](docs/README_ML_CORE.md).
-
-## Backend с нуля и интеграция ML
-
-Нужны Python 3.11, Docker Compose и разрешённые локальные CSV. Приватность
-репозитория и доступ жюри проверяются отдельно; CSV нельзя публиковать в публичном
-репозитории. Их фактические пути защищены .gitignore.
-
-После настройки .env установите зависимости в активированное окружение:
+## Проверки
 
 ```sh
 python -m pip install -r backend/requirements-dev.txt
-```
-
-Версии зафиксированы в requirements.txt/requirements.lock. Используются существующие
-POSTGRES_HOST/PORT/DB/USER/PASSWORD либо приоритетный DATABASE_URL. В Docker backend
-получает host=db, port=5432 и отдельный DOCKER_DATABASE_URL, если он задан. Локальный
-DATABASE_URL намеренно не переносится в контейнер. Пользователь/база/внешний порт db
-настраиваются через env. Не меняйте пароль уже созданного volume одним редактированием env:
-это не меняет пароль самой существующей БД.
-
-**Следующие команды создают таблицы и загружают данные. Они приведены как инструкция;
-для рабочей БД нужны отдельное разрешение и резервная копия. Схемы не применяются при старте API.**
-
-```sh
-# Запуск PostgreSQL (не удаляет volumes).
-docker compose up -d db
-# Первый запуск схем в выбранной базе:
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < backend/db/schema.sql
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < backend/db/mvp.sql
-# Если прежняя MVP-схема уже создавалась: сначала upgrade_mvp_v2.sql, затем текущий mvp.sql.
-# Старые completed-результаты отдельно проверить на новый DTO statements/sources.
-```
-
-CSV поместите в `data/raw/` согласно `DATA_DIR` с именами из раздела импорта.
-Для локальной загрузки используйте `python backend/scripts/import_csv.py`. По умолчанию
-заполненные таблицы не очищаются; --replace явно заменяет три исходные таблицы.
-Демонстрационные новости: `python backend/scripts/seed_demo_news.py`; скрипт пишет
-только синтетические данные, повторный запуск не создаёт копии. Для рабочей БД его
-запуск также требует разрешения. После замены raw-данных старые анализы не удаляются;
-их актуальность нужно проверить отдельно.
-
-```sh
-# Локальный API:
-python -m uvicorn app.api.main:app --app-dir backend --reload
-# Либо весь стек после подготовки базы:
-docker compose up --build -d
-```
-
-Актуальный демо-набор Compose: `U_44564,U_19717,U_9250`, роли `ceo/cfo`.
-Compose фиксирует эти ID независимо от переменных текущего терминала. Для запросов
-передавайте `X-Company-ID` выбранной компании; старые примеры U_81 ниже относятся
-к прежней конфигурации.
-
-Swagger: http://localhost:8000/docs. Без данных работает roles; остальные сценарии
-требуют подготовленной БД. По умолчанию доступны CLIENT U_44564, U_19717, U_9250; ранее был выбран U_81, он подтверждён в исходных
-данных; разрешённые CLIENT-ID перечисляются в DEMO_COMPANY_IDS. Заголовок X-Company-ID
-выбирает компанию из этого списка. Это демо-контекст, не авторизация пользователя.
-
-```sh
-curl 'http://localhost:8000/api/v1/companies/U_81'
-curl 'http://localhost:8000/api/v1/demo-profiles'
-curl 'http://localhost:8000/api/v1/feed?company_id=U_81&role=cfo&limit=20&offset=0'
-curl 'http://localhost:8000/api/v1/my-analyses?company_id=U_81&role=cfo&tab=attention&status=completed'
-```
-
-Вкладки сохранённых разборов: all=«Все», ready=«Готовые», processing=«В обработке»,
-attention=«Требуют внимания». Последняя фильтрует importance important/critical,
-не status failed. Это соглашение ожидает подтверждения команды. Status и importance
-можно комбинировать, повторяя параметры в query. null не считается важным.
-
-POST /api/v1/analyses принимает company_id/role/news_id, создаёт запись и возвращает
-202/queued. После подключения ML конечный обработчик запускается отдельно:
-
-```sh
-python backend/scripts/process_analyses.py --limit 5
-```
-
-Жизненный цикл: queued → running → completed/failed. Без ML задача остаётся queued,
-result=null; фиктивных успешных результатов нет. GET /analyses/{id} отдаёт безопасный
-error_code при failed. Повтор: --analysis-id ID --retry --company-id U_81, только
-failed/просроченная running в пределах лимита. См. [интерфейс ML](docs/ML_INTEGRATION.md).
-Автоматической бесконечной очереди при запуске API нет.
-
-Feed принимает готовые оценки ML и сортирует их до пагинации. Пока их нет,
-ranking_mode=chronological и relevance_score=null — это ещё не персональное ранжирование.
-Материалы содержат дисклеймер об отсутствии индивидуальной инвестрекомендации.
-Чат без ML сохраняет вопрос и отвечает 503; передавайте Idempotency-Key, чтобы
-повтор с тем же текстом не дублировал сообщение. Без ключа повторы не объединяются.
-
-```sh
-# Unit/mock без рабочей базы:
 python -B -m unittest discover -s backend/tests -v
-# Интеграционные сценарии в отдельном временном PostgreSQL без TCP/volumes:
-POSTGRES_TEST_BIN=/opt/homebrew/opt/postgresql@16/bin python -B backend/scripts/run_integration_tests.py
 ```
 
-Для Linux задайте каталог PostgreSQL 16 с initdb/pg_ctl или добавьте его в PATH.
-Тестовый runner печатает отдельную цель, проверяет data_directory/имя базы и удаляет
-только свои временные ресурсы после остановки. Не указывайте рабочую БД для тестов.
-Подробности и ограничения: [Backend MVP](docs/BACKEND_MVP.md).
+Frontend: `npm ci` и `npm run build` из `frontend/`. PostgreSQL integration runner: `backend/scripts/run_integration_tests.py`, требует отдельного временного Unix-socket кластера и PostgreSQL binaries на Linux/macOS. Обычный unit-прогон пропускает эти тесты. CI: `.github/workflows/acceptance.yml`.
 
-## 🌍 Доступные сервисы
-
-После успешного запуска всё крутится локально:
-
-* **Frontend (React/Vite):** http://localhost:3000
-* **Backend API (FastAPI):** http://localhost:8000
-* **Документация API (Swagger):** http://localhost:8000/docs (используйте для тестирования эндпоинтов)
-
-## 📁 Где мы пишем код (Структура проекта)
-
-Ориентируемся на следующую структуру папок, чтобы не блокировать друг друга:
-
-* `backend/app/parsers/` — сбор внешних новостей и парсинг данных.
-* `backend/app/agents/` — многошаговая логика AI, вызовы LLM и RAG-поиск.
-* `backend/app/services/` — вспомогательная логика, графы, обработка данных.
-* `backend/api/` — эндпоинты FastAPI и точка входа `main.py`.
-* `frontend/src/` — UI/UX и взаимодействие с бэкендом (React/Vite).
-* `docs/` — документация по проекту (например, архитектура).
-
-> **Важно:** Сырые тяжелые данные и выборки (в папках `data/raw/` и `data/synthetic_samples/`) лежат локально и в гит не отправляются.
-
-## 🛡 Правила работы с Git
-
-Прямые пуши в ветку `main` **не рекомендуются** без предварительного согласования с командой. Старайтесь придерживаться следующего workflow:
-
-1. Возьмите задачу и создайте свою ветку от `main`:
-```bash
-git checkout -b feat/your-feature-name
-
-```
-
-
-2. Пишите код, делайте коммиты:
-```bash
-git commit -m "feat: add news parser"
-
-```
-
-
-3. Пушьте ветку:
-```bash
-git push origin feat/your-feature-name
-
-```
-
-
-4. Заходите на GitHub и создавайте Pull Request. Это поможет избежать конфликтов и держать код в порядке.
+[Результаты проверки](docs/VALIDATION.md). Исторические датированные отчёты и планы в docs не заменяют этот README.
