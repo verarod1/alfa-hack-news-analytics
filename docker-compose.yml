@@ -63,7 +63,11 @@ services:
     env_file:
       - .env
     environment: *backend-environment
-    volumes: *backend-volumes
+    volumes:
+      - ./data:/app/data:ro
+      - ./data/chroma_db:/app/data/chroma_db:rw
+      - ./data/cache:/app/data/cache:rw
+      - ./data/ocr_cache:/app/data/ocr_cache:rw
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
