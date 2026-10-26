@@ -11,11 +11,11 @@
 - requests, truststore, BeautifulSoup4, feedparser: HTTP, сертификаты и сбор публикаций.
 - pandas, NetworkX присутствуют в наборе зависимостей; их наличие не означает отдельную графовую ML-модель.
 - OpenAI Python SDK: клиент совместимого API внешнего провайдера, не свидетельство использования моделей OpenAI.
-- ChromaDB, sentence-transformers, PyTorch CPU: локальный векторный поиск и embeddings.
+- ChromaDB, sentence-transformers, PyTorch: локальный векторный поиск и embeddings. `requirements.txt` добавляет индекс CPU-пакетов PyTorch, но конкретный wheel и архитектура не подтверждены чистой сборкой в этом комплекте.
 - PyMuPDF и pypdf: PDF; условия распространения PyMuPDF следует отдельно проверить перед публикацией образа.
 - unittest, HTTPX2/TestClient: тесты.
 
-Базовые образы перечислены в Dockerfiles и Compose, пока без digest. Полная транзитивная ведомость определяется lock-файлами.
+Базовые образы перечислены в Dockerfiles и Compose, пока без digest. Python constraints фиксирует версии без хешей артефактов; `frontend/package-lock.json` содержит версии и integrity для npm-пакетов. Лицензии проверяйте по конкретным устанавливаемым дистрибутивам.
 
 ## Модели и сервисы
 
