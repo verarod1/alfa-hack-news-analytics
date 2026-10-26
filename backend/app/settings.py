@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     llm_chat_model: str = ""
     llm_ocr_model: str = "Qwen3-VL-30B-A3B-Instruct"
     rag_top_k: int = Field(default=3, ge=1, le=10)
-    news_sources: str = "cbr,interfax,finmarket"
+    news_sources: str = "cbr,government"
+    news_poll_seconds: int = Field(default=1800, ge=60, le=86400)
+    news_government_rss_url: str = "http://government.ru/all/rss/"
     news_cbr_rss_url: str = "https://www.cbr.ru/rss/RssPress"
     news_interfax_rss_url: str = "https://www.interfax.ru/rss"
     news_finmarket_rss_url: str = "https://www.finmarket.ru/rss/mainnews.asp"
