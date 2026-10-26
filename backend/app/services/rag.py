@@ -1,7 +1,5 @@
-"""Существующий RAG: постоянный индекс, постраничный кэш и явное добавление PDF.
+"""Автоматический RAG: ленивая инициализация, постраничный кэш и SHA-256 хэширование."""
 
-Индексация запускается отдельно. Импорт модуля и запросы API не вызывают OCR.
-"""
 import base64
 import hashlib
 import json
@@ -11,6 +9,12 @@ from pathlib import Path
 from app.settings import ROOT, Settings
 from app.services.llm_client import get_client, model_name
 
+# Кроссплатформенная заглушка для fcntl (чтобы не падало на Windows вне Docker)
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 
 def local_path(value):
     path = Path(value)
@@ -18,7 +22,6 @@ def local_path(value):
 
 
 def manifest_path():
-    # Пользовательский BANK_MATERIALS_PATH читается Backend отдельно и не перезаписывается.
     return local_path(Settings().ocr_cache_dir) / "bank_materials.json"
 
 
@@ -40,13 +43,12 @@ def get_collection():
     path.mkdir(parents=True, exist_ok=True)
     embedding = SentenceTransformerEmbeddingFunction(model_name=settings.embedding_model)
     client = chromadb.PersistentClient(path=str(path), settings=ChromaSettings(anonymized_telemetry=False))
-    # Другие эмбеддинги требуют отдельного индекса. Старые коллекции сохраняются.
     name = "bank_analytics_" + hashlib.sha256(settings.embedding_model.encode()).hexdigest()[:12]
     return client.get_or_create_collection(name, embedding_function=embedding)
 
 
 def extract_with_qwen_vl(page):
-    """Один явный OCR-вызов одной страницы, только по флагу --allow-ocr."""
+    """OCR-вызов одной страницы."""
     image = base64.b64encode(page.get_pixmap(dpi=120).tobytes("png")).decode("ascii")
     response = get_client().chat.completions.create(
         model=model_name("ocr"),
@@ -68,26 +70,37 @@ def chunk_text(text, chunk_size=600, overlap=100):
     return [text[start:start + chunk_size] for start in range(0, len(text), chunk_size - overlap)]
 
 
-def process_pdfs(*, allow_ocr=False, limit=5):
-    # Два индексатора не расходуют OCR-бюджет на одни страницы одновременно.
-    import fcntl
+def ensure_indexed(limit=10):
+    """
+    Ленивая инициализация: автоматически проверяет папку с PDF и 
+    обновляет базу перед поиском. Вызывается автоматически из retrieve_analytics.
+    """
     folder = local_path(Settings().ocr_cache_dir)
     folder.mkdir(parents=True, exist_ok=True)
-    with (folder / "index.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        return _process_pdfs(allow_ocr=allow_ocr, limit=limit)
+    
+    if fcntl:
+        with (folder / "index.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return _process_pdfs(limit=limit)
+    else:
+        return _process_pdfs(limit=limit)
 
 
-def _process_pdfs(*, allow_ocr=False, limit=5):
+def _process_pdfs(limit=10):
     import pymupdf
-    if not 1 <= limit <= 100:
-        raise ValueError("limit: 1..100")
     settings = Settings()
     pdfs = sorted(local_path(settings.bank_pdf_dir).glob("*.pdf"))
+    
+    if not pdfs:
+        print(" [RAG] Папка с PDF пуста.")
+        return
+
     documents, indexed, pending = [], [], []
     processed = 0
     seen = set()
+    
     for pdf in pdfs:
+        # 1. Считаем хэш файла (чтобы не парсить одно и то же)
         content_hash = hashlib.sha256()
         with pdf.open("rb") as source:
             for block in iter(lambda: source.read(1024 * 1024), b""):
@@ -96,33 +109,43 @@ def _process_pdfs(*, allow_ocr=False, limit=5):
         if digest in seen:
             continue
         seen.add(digest)
+        
         document_id = "bank_" + digest
         cache_path = local_path(settings.ocr_cache_dir) / (digest + ".json")
         cached = json.loads(cache_path.read_text()) if cache_path.exists() else {"pages": {}, "indexed_model": None}
-        # Ограничение относится к новым/изменённым документам, уже готовые остаются в манифесте.
+        
         needs_work = cached.get("indexed_model") != settings.embedding_model
         if needs_work and processed >= limit:
             pending.append(pdf.name)
             continue
         if needs_work:
             processed += 1
+            
         with pymupdf.open(pdf) as doc:
             for index, page in enumerate(doc):
                 number = str(index + 1)
                 if number in cached["pages"]:
                     continue
+                
+                # Пытаемся взять текстовый слой
                 text = page.get_text().strip()
-                if not text and allow_ocr:
+                # Если текста нет (это скан) - запускаем OCR АВТОМАТИЧЕСКИ
+                if not text:
+                    print(f" [RAG] Файл '{pdf.name}', стр. {number} - скан. Запускаю OCR...")
                     text = extract_with_qwen_vl(page)
+                    
                 if text:
                     cached["pages"][number] = text
-                    # Оплаченная страница сохраняется до индексации/обработки следующей.
-                    write_json(cache_path, cached)
+                    write_json(cache_path, cached) # Сохраняем каждую страницу
+                    
             complete = len(cached["pages"]) == len(doc)
+            
         if not complete:
             pending.append(pdf.name)
             continue
+            
         pages = [{"page": int(number), "text": text} for number, text in sorted(cached["pages"].items(), key=lambda item: int(item[0]))]
+        
         if needs_work:
             collection = get_collection()
             for page in pages:
@@ -136,39 +159,45 @@ def _process_pdfs(*, allow_ocr=False, limit=5):
             cached["indexed_model"] = settings.embedding_model
             write_json(cache_path, cached)
             indexed.append(pdf.name)
+            
         documents.append({"document_id": document_id, "title": pdf.name, "url": None, "pages": pages})
+        
+    if indexed:
+        print(f" [RAG] Проиндексировано новых документов: {len(indexed)}")
+        
     write_json(manifest_path(), documents)
     return {"indexed": indexed, "pending": pending, "documents": len(documents)}
 
 
 def retrieve_analytics(query, top_k=3):
-    # Пустой/неподготовленный RAG не загружает модель и не обращается к OCR.
+    """
+    Поиск в базе. ВНИМАНИЕ: перед поиском автоматически 
+    вызывает ensure_indexed(), чтобы подхватить новые PDF.
+    """
+    # ЛЕНИВАЯ ИНИЦИАЛИЗАЦИЯ (Автоматика)
+    ensure_indexed()
+
     path = manifest_path()
     if not path.exists() or not local_path(Settings().chroma_db_dir).is_dir():
         return []
+        
     documents = json.loads(path.read_text())
     ids = [item["document_id"] for item in documents]
     if not ids:
         return []
+        
     collection = get_collection()
     count = collection.count()
     if not count:
         return []
+        
     results = collection.query(query_texts=[query], n_results=min(top_k, count),
                                where={"document_id": {"$in": ids}})
     return [{"text": text, **metadata} for text, metadata in
             zip(results["documents"][0], results["metadatas"][0])]
 
-
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--allow-ocr", action="store_true", help="Разрешить платное распознавание новых страниц")
-    parser.add_argument("--limit", type=int, default=5)
-    args = parser.parse_args()
-    try:
-        print(json.dumps(process_pdfs(allow_ocr=args.allow_ocr, limit=args.limit), ensure_ascii=False))
-    except Exception:
-        import sys
-        print("Индексация не завершена. Проверьте PDF, кэш, embedding-модель и настройки OCR; сохранённые страницы остаются в кэше.", file=sys.stderr)
-        sys.exit(1)
+    # Этот блок теперь нужен только для ручной проверки в консоли
+    print("Запуск ручной синхронизации RAG...")
+    result = ensure_indexed()
+    print("Результат:", json.dumps(result, ensure_ascii=False, indent=2))
