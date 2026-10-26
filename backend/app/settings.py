@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     db_connect_timeout: int = Field(default=10, ge=1, le=60)
     db_statement_timeout_ms: int = Field(default=15000, ge=100, le=120000)
     demo_company_ids: str = "U_44564,U_19717,U_9250"
+    demo_allow_all_clients: bool = False
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     relations_limit: int = Field(default=200, ge=1, le=500)
     ml_adapter_module: str = ""
@@ -29,7 +30,10 @@ class Settings(BaseSettings):
     max_analysis_attempts: int = Field(default=3, ge=1, le=10)
     analysis_lease_seconds: int = Field(default=900, ge=60, le=86400)
     bank_materials_path: str = ""
-    news_sources: str = "cbr,interfax,finmarket"
+    ocr_cache_dir: str = "data/ocr_cache"
+    news_sources: str = "cbr,government"
+    news_poll_seconds: int = Field(default=1800, ge=60, le=86400)
+    news_government_rss_url: str = "http://government.ru/all/rss/"
     news_cbr_rss_url: str = "https://www.cbr.ru/rss/RssPress"
     news_interfax_rss_url: str = "https://www.interfax.ru/rss"
     news_finmarket_rss_url: str = "https://www.finmarket.ru/rss/mainnews.asp"

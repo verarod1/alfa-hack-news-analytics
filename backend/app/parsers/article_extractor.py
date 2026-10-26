@@ -6,6 +6,7 @@ from app.parsers.sources import CollectionError
 
 
 SELECTORS = {
+    "government": (".reader_article_body",),
     "interfax": ("[itemprop=articleBody]", "article"),
     "finmarket": ("[itemprop=articleBody]", ".newsbody", "article"),
     "minfin": (
@@ -44,7 +45,7 @@ def extract_article(body, source_code, expected_title, minimum=120):
     if source_code == "finmarket" and isinstance(body, bytes):
         encoding = "utf-8" if b"utf-8" in body[:4096].lower() or body.startswith(b"\xef\xbb\xbf") else "windows-1251"
     soup = BeautifulSoup(body, "html.parser", from_encoding=encoding)
-    heading = soup.find("h1")
+    heading = soup.select_one(".reader_article_headline") if source_code == "government" else soup.find("h1")
     actual_title = " ".join(heading.get_text(" ", strip=True).split()) if heading else ""
     expected = " ".join(expected_title.split()).casefold()
     if (

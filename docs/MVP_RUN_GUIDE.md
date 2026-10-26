@@ -8,13 +8,14 @@
 
 - Backend/Swagger: **http://localhost:8001/docs**.
 - OpenAPI: http://localhost:8001/openapi.json.
-- PostgreSQL с компьютера: `127.0.0.1:5433`; из Backend-контейнера: `db:5432`.
+- PostgreSQL внутри Compose: `db:5432`; актуальный main не публикует порт БД на компьютер.
 - Существующий frontend: **http://localhost:3000**.
 
-**Про визуал:** `frontend/src/App.tsx` сейчас содержит стартовый экран Vite, а не
-аналитический интерфейс, подключённый к API. Он запускается отдельно и не заменяет
-демонстрацию функций. Реально «потыкать» карточки, связи, ленту и API анализа/чата
-можно в Swagger через **Try it out → Execute**. Новый frontend здесь не создавался.
+**Про визуал:** в актуальном main есть интерфейс выбора компании, ролей, ленты,
+разбора и чата. Открой http://localhost:3000/demo, выбери профиль и роль,
+затем «Открыть Альфа-Бизнес» → «Перейти к новостям». По умолчанию используется
+реальный API через nginx `/api/`; моки включаются только явно. Баланс/операции
+на банковском домашнем экране демонстрационные, не данные PostgreSQL.
 
 ## 1. Программы и правильная папка
 
@@ -103,8 +104,8 @@ export ML_ADAPTER_MODULE=
 
 ```bash
 docker compose config --quiet
-docker compose build backend
-docker compose up -d db backend
+docker compose build backend frontend
+docker compose up -d db backend frontend analysis-worker news-collector
 docker compose ps
 curl -f http://localhost:8001/openapi.json
 ```
@@ -189,20 +190,20 @@ docker compose exec backend python scripts/collect_news.py --source cbr --limit 
 **При ошибке:** смотри код в JSON. Недоступность источника не исправляется отключением
 robots/TLS или обходом ограничений.
 
-Команды двух дополнительных адаптеров:
+Дополнительный подтверждённый официальный источник — Правительство России:
 
 ```bash
-docker compose exec backend python scripts/collect_news.py --source interfax --limit 3
-docker compose exec backend python scripts/collect_news.py --source finmarket --limit 3
-# Общий ограниченный проход:
+docker compose exec backend python scripts/collect_news.py --source government --limit 3
 docker compose exec backend python scripts/collect_news.py --source all --limit 3
 ```
 
-**Текущий ожидаемый результат:** `SOURCE_RIGHTS_REQUIRED` для Интерфакса/Финмаркета,
-без загрузки статей и записи их текстов. RSS обоих доступен; Windows-1251 Финмаркета
-проверен. Прав для хранения/показа полных текстов пока не подтверждено. Код выхода 1
-для общего прохода означает частично пропущенные источники, а не потерю новостей ЦБ.
-Платная подписка не подключена. Полноценная работа этих двух источников не заявляется.
+**Ожидается:** сохранение/возврат существующих ID без дубликатов. NEWS_SOURCES по
+умолчанию `cbr,government`. Сервис `news-collector` повторяет ограниченный сбор
+каждые NEWS_POLL_SECONDS (по умолчанию 1800 секунд), максимум 5 записей на источник
+за цикл; ML не запускает. Правительство предоставляет официальный канал по HTTP;
+это явно ограниченное исключение для government.ru, HTTPS других источников сохранён.
+Интерфакс/Финмаркет остаются заблокированными до подтверждения прав и по умолчанию
+не опрашиваются. Статус источников и реальные проверки — в INTEGRATION_2026_10_26.md.
 
 ## 6. Локальные официальные фикстуры
 
@@ -230,24 +231,19 @@ docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SEL
 
 **Ожидается на текущей базе:** cbr=3, fns=2, число уникальных хешей равно числу записей.
 
-## 7. Запуск существующего визуала
-
-**Команды:**
+## 7. Запуск интерфейса вместе с Backend
 
 ```bash
-docker compose build frontend
 docker compose up -d --no-deps frontend
+curl -f http://localhost:3000/api/v1/roles
 ```
 
-**Ожидается:** http://localhost:3000 открывает имеющийся экран Vite. `--no-deps`
-оставляет уже запущенный backend без повторного пересоздания.
-**При ошибке:** `docker compose logs --tail=80 frontend`; проверь сборку и свободный
-порт 3000. Исходники frontend менять для этой инструкции не нужно.
-
-Этот экран пока не умеет выбирать компании или вызывать анализ. Для реального
-прогона ниже открой **http://localhost:8001/docs**. Frontend-разработчику нужно
-подключить проектный интерфейс к `http://localhost:8001/api/v1`, передавать company/role
-и `X-Company-ID`; готового API-конфига внутри нынешнего Vite-шаблона нет.
+**Ожидается:** http://localhost:3000/demo показывает три компании и две роли;
+HTTP-запрос через frontend/nginx возвращает роли Backend. Для компаний нужны
+реальные CSV в PostgreSQL; на пустой базе список будет пустым.
+**При ошибке:** `docker compose logs --tail=80 frontend backend`; проверь свободный
+порт 3000 и upstream backend:8000. Frontend-исходники менять для запуска не нужно.
+Подробный прогон с новой БД и без локальных кэшей — `docs/DOCKER_CLEAN_MACHINE.md`.
 
 ## 8. Компании, роли, карточки и связи
 
@@ -385,8 +381,8 @@ docker compose exec backend python scripts/process_analyses.py --analysis-id "$A
 docker compose exec backend python -B -m unittest discover -s tests -v
 ```
 
-**Ожидается:** 43 сценария обнаружены, 33 проходят, 10 PostgreSQL-сценариев намеренно
-пропущены. SDK проверяется через локальный HTTP stub, RAG — без оплаченного OCR.
+**Ожидается:** основные тесты проходят; PostgreSQL-сценарии намеренно
+пропущены и запускаются отдельным runner ниже. SDK проверяется через локальный HTTP stub, RAG — без оплаченного OCR.
 **При ошибке:** проверь, что контейнер собран из main и использует актуальные файлы.
 
 **Отдельный временный PostgreSQL** (если локальное Python-окружение ещё не создано,
@@ -414,12 +410,12 @@ POSTGRES_TEST_BIN. Не подставляй рабочую DATABASE_URL как 
 6. В безопасном режиме покажи queued и сохранение вопроса без поддельного AI-ответа.
 7. Только в отдельно согласованном реальном прогоне запусти ограниченный worker,
    покажи completed, подтверждённые источники, историю чата. Иначе покажи результаты изолированных тестов.
-8. Отдельно открой localhost:3000 и честно обозначь текущий Vite-шаблон: продуктовый UI ещё подключает frontend-разработчик.
+8. Открой localhost:3000/demo, повтори выбор компаний/ролей и открытие новостей через настоящий интерфейс. Разделы связей и списка сохранённых анализов ещё требуют отдельных UI-экранов.
 
 ## 14. Остановка без удаления данных
 
 ```bash
-docker compose stop frontend backend db
+docker compose stop frontend backend analysis-worker news-collector db
 ```
 
 **Ожидается:** сервисы остановлены, PostgreSQL volume и Chroma/OCR/model cache сохранены.
@@ -428,5 +424,5 @@ docker compose stop frontend backend db
 
 Оставшиеся ограничения: 0 фикстур Минфина; права на Интерфакс/Финмаркет не подтверждены;
 качество реальных LLM/OCR/эмбеддингов требует проверки команды на разрешённых PDF и
-ограниченном бюджете; продуктовый frontend пока не подключён к API. Готовые кэши
+ограниченном бюджете; UI связей и списка сохранённых анализов ещё не реализован. Готовые кэши
 не отслеживаются, но старый OCR-blob остаётся в истории ML — историю не переписывали.

@@ -1,4 +1,41 @@
 
+x-backend-environment: &backend-environment
+  DATABASE_URL: ${DOCKER_DATABASE_URL:-}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-alfa_news}
+  POSTGRES_USER: ${POSTGRES_USER:-alfa_user}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+  DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-10}
+  DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
+  # Фиксированный набор для этой демонстрации: переменные PowerShell не должны его менять.
+  DEMO_COMPANY_IDS: U_44564,U_19717,U_9250
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  RELATIONS_LIMIT: ${RELATIONS_LIMIT:-200}
+  ML_ADAPTER_MODULE: ${ML_ADAPTER_MODULE:-}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-Gemma-4-26B-A4B}
+  LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+  LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
+  MAX_ANALYSIS_ATTEMPTS: ${MAX_ANALYSIS_ATTEMPTS:-3}
+  ANALYSIS_LEASE_SECONDS: ${ANALYSIS_LEASE_SECONDS:-900}
+  DATA_DIR: ${DOCKER_DATA_DIR:-/app/data/raw}
+  BANK_PDF_DIR: /app/data/raw/bank_analytics
+  CHROMA_DB_DIR: /app/data/chroma_db
+  OCR_CACHE_DIR: /app/data/ocr_cache
+  HF_HOME: /app/data/model_cache
+  BANK_MATERIALS_PATH: ${DOCKER_BANK_MATERIALS_PATH:-}
+  NEWS_SOURCES: ${NEWS_SOURCES:-cbr,government}
+  NEWS_LIMIT: ${NEWS_LIMIT:-3}
+  NEWS_POLL_SECONDS: ${NEWS_POLL_SECONDS:-1800}
+
+x-backend-volumes: &backend-volumes
+  - ./data:/app/data:ro
+  - ./data/chroma_db:/app/data/chroma_db:rw
+  - ./data/ocr_cache:/app/data/ocr_cache:rw
+  - ./data/model_cache:/app/data/model_cache:rw
+
 services:
   db:
     image: postgres:16
@@ -7,8 +44,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-alfa_news}
       POSTGRES_USER: ${POSTGRES_USER:-alfa_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,36 +55,15 @@ services:
 
   
   backend:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: alfa_hack_backend
     env_file:
       - .env
-    environment:
-      DATABASE_URL: ${DOCKER_DATABASE_URL:-}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: ${POSTGRES_DB:-alfa_news}
-      POSTGRES_USER: ${POSTGRES_USER:-alfa_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-10}
-      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
-      DEMO_COMPANY_IDS: ${DEMO_COMPANY_IDS:-U_44564,U_19717,U_9250}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-      RELATIONS_LIMIT: ${RELATIONS_LIMIT:-200}
-      ML_ADAPTER_MODULE: ${ML_ADAPTER_MODULE:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-Gemma-4-26B-A4B}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
-      MAX_ANALYSIS_ATTEMPTS: ${MAX_ANALYSIS_ATTEMPTS:-3}
-      ANALYSIS_LEASE_SECONDS: ${ANALYSIS_LEASE_SECONDS:-900}
-      BANK_MATERIALS_PATH: ${BANK_MATERIALS_PATH:-}
-      DATA_DIR: ${DOCKER_DATA_DIR:-/app/data/raw}
-    volumes:
-      - ./data:/app/data:ro
+    environment: *backend-environment
+    volumes: *backend-volumes
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -57,6 +71,40 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  analysis-worker:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment: *backend-environment
+    volumes: *backend-volumes
+    command: ["python", "-u", "scripts/analysis_worker.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  news-collector:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      <<: *backend-environment
+      ML_ADAPTER_MODULE: ""
+      LLM_API_KEY: ""
+      LLM_BASE_URL: ""
+    volumes: *backend-volumes
+    command: ["python", "-u", "scripts/news_worker.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     build:

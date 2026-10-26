@@ -22,6 +22,7 @@ class Source:
     hosts: tuple[str, ...]
     article_pattern: str
     collection_allowed: bool = True
+    allow_http: bool = False
 
     def url(self, value, *, feed=False):
         try:
@@ -43,8 +44,9 @@ class Source:
                     raise ValueError
             elif not re.fullmatch(self.article_pattern, parsed.path):
                 raise ValueError
-            # Known official hosts support HTTPS. Never follow a downgrade redirect.
-            return urlunsplit(("https", parsed.hostname, parsed.path or "/", parsed.query, ""))
+            # One reviewed official endpoint is HTTP-only; every other source stays HTTPS.
+            scheme = "http" if self.allow_http and parsed.scheme == "http" else "https"
+            return urlunsplit((scheme, parsed.hostname, parsed.path or "/", parsed.query, ""))
         except (ValueError, AttributeError):
             raise CollectionError("URL_NOT_ALLOWED") from None
 
@@ -59,6 +61,10 @@ SOURCES = {
     "cbr": Source(
         "cbr", "Банк России", "https://www.cbr.ru/rss/RssPress",
         ("www.cbr.ru", "cbr.ru"), r"/press/(?:PR|pr|event)/?",
+    ),
+    "government": Source(
+        "government", "Правительство России", "http://government.ru/all/rss/",
+        ("government.ru",), r"/news/\d+/?", allow_http=True,
     ),
     "interfax": Source(
         "interfax", "Интерфакс", "https://www.interfax.ru/rss",
