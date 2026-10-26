@@ -1,4 +1,4 @@
-# Isolated synthetic acceptance environment. Never reads .env or private data.
+# Isolated synthetic acceptance environment. Services receive no values from .env.
 name: alfa-review
 
 x-review-env: &review-env

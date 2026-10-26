@@ -9,13 +9,14 @@
 ```sh
 git clone https://github.com/verarod1/alfa-hack-news-analytics.git
 cd alfa-hack-news-analytics
+git switch front/upd
 docker compose -f compose.review.yml up --build --wait --wait-timeout 180
 docker compose -f compose.review.yml --profile check run --rm smoke
 ```
 
 Откройте http://localhost:3100/demo. Swagger: http://localhost:8100/docs. OpenAPI: http://localhost:8100/openapi.json.
 
-**Это синтетический технический тест, а не оценка качества AI.** Отдельная БД содержит три искусственные компании, платежи, связи и новости. Тестовый адаптер явно помечает ответы; внешние LLM/RSS не вызываются. `.env`, закрытые CSV и ключи не нужны. Не объединяйте проверочный и обычный Compose. Публичный пароль проверочной БД пригоден только для этого локального окружения.
+**Это синтетический технический тест, а не оценка качества AI.** Отдельная БД содержит три искусственные компании, платежи, связи и новости. Тестовый адаптер явно помечает ответы; внешние LLM/RSS не вызываются. Закрытые CSV и ключи не нужны; проверочный файл Compose не передаёт значения из `.env` сервисам. Запускайте его отдельно от обычного Compose. Публичный пароль проверочной БД пригоден только для этого локального окружения.
 
 Учётные записи не нужны: выберите `U_44564`, `U_19717` или `U_9250`, затем CEO/CFO. Это демо-контекст, не пользовательская аутентификация.
 
@@ -37,7 +38,7 @@ docker compose run --rm backend python scripts/import_csv.py
 docker compose up --build -d
 ```
 
-Для старой MVP-схемы изучите `backend/db/upgrade_mvp_v2.sql`. Импорт не заменяет заполненные таблицы без явного `--replace`. Не меняйте пароль существующей БД только в `.env`: это не обновляет пароль в PostgreSQL.
+Для старой MVP-схемы изучите `backend/db/upgrade_mvp_v2.sql`; команды выше рассчитаны на новую БД. Импорт не заменяет заполненные таблицы без явного `--replace`. Не меняйте пароль существующей БД только в `.env`: это не обновляет пароль в PostgreSQL.
 
 Интерфейс: http://localhost:3000/demo, Swagger: http://localhost:8000/docs. Обычный Compose запускает PostgreSQL, API, frontend, analysis-worker и news-collector. Сборщик зависит от доступности реальных RSS. Сохранённые снимки можно загрузить командой `docker compose exec backend python scripts/import_news_fixtures.py`.
 
@@ -59,7 +60,7 @@ React/TypeScript/Vite → nginx → FastAPI → PostgreSQL. Analysis-worker об
 
 [Архитектура и модель данных](docs/ARCHITECTURE.md), [API](docs/api/API_CONTRACT.md), [компоненты и имитации](THIRD_PARTY_NOTICES.md), [комплект сдачи](SUBMISSION.md).
 
-Python 3.11 в Docker; зависимости закреплены `backend/requirements.txt` и `requirements.lock`. Frontend устанавливается `npm ci` по `frontend/package-lock.json`. Docker-образы используют изменяемые теги; побитовая воспроизводимость и revision embedding-модели пока не зафиксированы.
+Python 3.11 в Docker; версии Python-пакетов закреплены `backend/requirements.txt` и `requirements.lock`, но хеши артефактов отсутствуют. Frontend устанавливается `npm ci` по `frontend/package-lock.json`. Docker-образы используют изменяемые теги; побитовая воспроизводимость и revision embedding-модели пока не зафиксированы. Проверка lock-файла, указанная в нём самом, относится к Linux ARM64; чистая сборка AMD64 отдельно не подтверждена.
 
 ## Проверки
 
