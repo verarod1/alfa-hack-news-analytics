@@ -26,6 +26,9 @@ x-backend-environment: &backend-environment
   OCR_CACHE_DIR: /app/data/ocr_cache
   HF_HOME: /app/data/model_cache
   BANK_MATERIALS_PATH: ${DOCKER_BANK_MATERIALS_PATH:-}
+  NEWS_SOURCES: ${NEWS_SOURCES:-cbr,government}
+  NEWS_LIMIT: ${NEWS_LIMIT:-3}
+  NEWS_POLL_SECONDS: ${NEWS_POLL_SECONDS:-1800}
 
 x-backend-volumes: &backend-volumes
   - ./data:/app/data:ro
@@ -52,6 +55,7 @@ services:
 
   
   backend:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -68,6 +72,7 @@ services:
     restart: unless-stopped
 
   analysis-worker:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -81,6 +86,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+
+  news-collector:
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      <<: *backend-environment
+      ML_ADAPTER_MODULE: ""
+      LLM_API_KEY: ""
+      LLM_BASE_URL: ""
+    volumes: *backend-volumes
+    command: ["python", "-u", "scripts/news_worker.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     build:

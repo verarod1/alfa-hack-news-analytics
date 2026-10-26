@@ -23,10 +23,10 @@ class Response:
     url: str
 
 
-def public_addresses(host):
+def public_addresses(host, port=443):
     try:
         addresses = list(dict.fromkeys(
-            item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+            item[4][0] for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
         ))
     except OSError:
         raise CollectionError("DNS_ERROR") from None
@@ -104,12 +104,15 @@ class NewsHTTPClient:
         self.context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
     def _request(self, url, max_bytes):
-        host = urlsplit(url).hostname
-        address = public_addresses(host)[0]
-        connection = http.client.HTTPSConnection(host, timeout=self.timeout, context=self.context)
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        port = 80 if parsed.scheme == "http" else 443
+        address = public_addresses(host, port)[0]
+        connection = (http.client.HTTPConnection(host, timeout=self.timeout) if port == 80 else
+                      http.client.HTTPSConnection(host, timeout=self.timeout, context=self.context))
         # Pin the validated address, but keep the original host for Host/SNI/certificate checks.
         connection._create_connection = lambda ignored, timeout, source_address=None: socket.create_connection(
-            (address, 443), timeout, source_address
+            (address, port), timeout, source_address
         )
         start = time.monotonic()
         try:
@@ -164,22 +167,24 @@ class NewsHTTPClient:
         self._last_request[host] = time.monotonic()
 
     def _check_robots(self, url):
-        host = urlsplit(url).hostname
-        if host not in self._robots:
-            response = self._request("https://" + host + "/robots.txt", min(self.max_bytes, 300000))
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        key = (parsed.scheme, host)
+        if key not in self._robots:
+            response = self._request(parsed.scheme + "://" + host + "/robots.txt", min(self.max_bytes, 300000))
             if response.status == 404:
-                self._robots[host] = ""
+                self._robots[key] = ""
             elif response.status == 200:
                 if b"<html" in response.body.lower() or b"<!doctype" in response.body.lower():
                     raise CollectionError("ROBOTS_INVALID")
                 try:
-                    self._robots[host] = response.body.decode("utf-8-sig", errors="strict")
+                    self._robots[key] = response.body.decode("utf-8-sig", errors="strict")
                 except UnicodeError:
                     raise CollectionError("ROBOTS_INVALID") from None
             else:
                 raise CollectionError("ROBOTS_UNAVAILABLE", response.status, response.headers.get("retry-after"))
             self._last_request[host] = time.monotonic()
-        allowed, delay = robots_rules(self._robots[host], self.user_agent, url)
+        allowed, delay = robots_rules(self._robots[key], self.user_agent, url)
         if not allowed:
             raise CollectionError("ROBOTS_DENIED")
         self._pace(host, max(delay, self.delay))
@@ -191,7 +196,7 @@ class NewsHTTPClient:
             response = self._request(url, self.max_bytes)
             if response.status in (301, 302, 303, 307, 308):
                 target = urljoin(url, response.headers.get("location", ""))
-                if urlsplit(target).scheme != "https":
+                if urlsplit(target).scheme != "https" and not (source.allow_http and urlsplit(target).scheme == "http"):
                     raise CollectionError("REDIRECT_NOT_ALLOWED")
                 url = source.url(target, feed=feed)
                 continue

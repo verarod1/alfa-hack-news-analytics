@@ -10,9 +10,10 @@ from app.services.errors import ServiceError
 def bank_materials():
     path = Settings().bank_materials_path
     if not path:
-        # Манифест создаёт только явный локальный индексатор PDF, не запрос API.
-        from app.services.rag import manifest_path
-        location = manifest_path()
+        # Читать готовый манифест можно без импорта/инициализации ML и Chroma.
+        location = Path(Settings().ocr_cache_dir) / "bank_materials.json"
+        if not location.is_absolute():
+            location = ROOT / location
         if not location.exists():
             return []
         path = str(location)
@@ -59,6 +60,8 @@ def verify_sources(sources, news, documents):
                     news.title + " " + (news.text or "")
                 ):
                     raise ValueError("Цитата отсутствует в новости")
+            source.title = news.title
+            source.published_at = news.published_at
         else:
             text = pages.get((source.document_id, source.page))
             document = documents_by_id.get(source.document_id)
@@ -70,6 +73,8 @@ def verify_sources(sources, news, documents):
                 or normalized(source.quote or "") not in normalized(text)
             ):
                 raise ValueError("Документ, страница или цитата банка не подтверждены")
+            source.document_title = document.title
+            source.title = document.title
 
 
 def verify_bank_opinion(opinion, sources):
