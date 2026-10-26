@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     postgres_password: SecretStr = SecretStr("")
     db_connect_timeout: int = Field(default=10, ge=1, le=60)
     db_statement_timeout_ms: int = Field(default=15000, ge=100, le=120000)
+    import_statement_timeout_ms: int = Field(default=600000, ge=1000, le=3600000)
     demo_company_ids: str = "U_44564,U_19717,U_9250"
     demo_allow_all_clients: bool = False
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
@@ -55,6 +56,10 @@ class Settings(BaseSettings):
     news_max_age_days: int = Field(default=30, ge=0, le=3650)
     news_min_text_chars: int = Field(default=120, ge=40, le=1000)
     news_keywords: str = ""
+    feed_include_synthetic: bool = False
+    news_rank_enabled: bool = False
+    news_rank_limit: int = Field(default=3, ge=1, le=20)
+    news_rank_poll_seconds: int = Field(default=600, ge=60, le=86400)
 
     def company_ids(self):
         return tuple(

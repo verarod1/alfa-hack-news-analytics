@@ -18,9 +18,10 @@ def run_once():
     codes=list(dict.fromkeys(code.strip() for code in settings.news_sources.split(',') if code.strip()))
     if not codes or any(code not in SOURCES for code in codes):
         raise ValueError('Invalid NEWS_SOURCES')
-    report=collect(codes,settings,limit=min(settings.news_limit,5))
+    report=collect(codes,settings,limit=settings.news_limit,
+                   keywords=tuple(w.strip() for w in settings.news_keywords.split(',') if w.strip()))
     for row in report['sources']:
-        logger.info('source=%s stored_or_existing=%s errors=%s',row['source'],row['stored_or_existing'],[error['code'] for error in row['errors']])
+        logger.info('source=%s stored_or_existing=%s errors=%s warnings=%s',row['source'],row['stored_or_existing'],[error['code'] for error in row['errors']],row.get('warnings',[]))
     return report
 
 

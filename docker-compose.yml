@@ -8,6 +8,7 @@ x-backend-environment: &backend-environment
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
   DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-10}
   DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
+  IMPORT_STATEMENT_TIMEOUT_MS: ${IMPORT_STATEMENT_TIMEOUT_MS:-600000}
   # Фиксированный набор для этой демонстрации: переменные PowerShell не должны его менять.
   DEMO_COMPANY_IDS: U_44564,U_19717,U_9250
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -29,6 +30,13 @@ x-backend-environment: &backend-environment
   NEWS_SOURCES: ${NEWS_SOURCES:-cbr,government}
   NEWS_LIMIT: ${NEWS_LIMIT:-3}
   NEWS_POLL_SECONDS: ${NEWS_POLL_SECONDS:-1800}
+  NEWS_KEYWORDS: ${NEWS_KEYWORDS:-}
+  NEWS_MAX_AGE_DAYS: ${NEWS_MAX_AGE_DAYS:-30}
+  FEED_INCLUDE_SYNTHETIC: ${FEED_INCLUDE_SYNTHETIC:-false}
+  NEWS_RANK_ENABLED: ${NEWS_RANK_ENABLED:-false}
+  NEWS_RANK_LIMIT: ${NEWS_RANK_LIMIT:-3}
+  NEWS_RANK_POLL_SECONDS: ${NEWS_RANK_POLL_SECONDS:-600}
+  LLM_RANK_MODEL: ${LLM_RANK_MODEL:-}
 
 x-backend-volumes: &backend-volumes
   - ./data:/app/data:ro
@@ -105,6 +113,22 @@ services:
       LLM_BASE_URL: ""
     volumes: *backend-volumes
     command: ["python", "-u", "scripts/news_worker.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ranking-worker:
+    profiles: ["ranking"]
+    image: ${BACKEND_IMAGE:-alfa-hack-news-analytics-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment: *backend-environment
+    volumes: *backend-volumes
+    command: ["python", "-u", "scripts/ranking_worker.py"]
     depends_on:
       db:
         condition: service_healthy

@@ -1,5 +1,6 @@
 from psycopg.rows import dict_row
 from app.database import get_connection
+from app.settings import Settings
 
 
 def save_news(values):
@@ -70,8 +71,10 @@ def get_feed(company_id, role, impact_type, limit, offset):
             ORDER BY created_at DESC, id DESC LIMIT 1
         ) a ON true
         WHERE (%s::text IS NULL OR a.result->>'impact_type'=%s)
+          AND (%s OR n.is_synthetic = false)
     """
-    params = (company_id, role, company_id, role, impact_type, impact_type)
+    params = (company_id, role, company_id, role, impact_type, impact_type,
+              Settings().feed_include_synthetic)
     with get_connection() as conn, conn.cursor(row_factory=dict_row) as cursor:
         # Одна snapshot для total и страницы при параллельной записи.
         cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
@@ -86,3 +89,18 @@ def get_feed(company_id, role, impact_type, limit, offset):
             (*params, limit, offset),
         )
         return cursor.fetchall(), counts["total"], counts["scored"]
+
+
+def list_unranked_news(company_id, role, limit, max_age_days):
+    """Persistent backlog: successful scores are never requested again."""
+    with get_connection() as conn, conn.cursor(row_factory=dict_row) as cursor:
+        cursor.execute(
+            "SELECT n.* FROM news n WHERE n.is_synthetic = false "
+            "AND (%s = 0 OR COALESCE(n.published_at, n.created_at) >= "
+            "now() - make_interval(days => %s)) "
+            "AND NOT EXISTS (SELECT 1 FROM news_relevance r "
+            "WHERE r.news_id=n.id AND r.company_id=%s AND r.role=%s) "
+            "ORDER BY n.published_at DESC NULLS LAST, n.id LIMIT %s",
+            (max_age_days, max_age_days, company_id, role, limit),
+        )
+        return cursor.fetchall()

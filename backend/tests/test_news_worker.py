@@ -13,9 +13,14 @@ class NewsWorkerTests(TestCase):
         with patch.dict(os.environ,{'NEWS_SOURCES':'cbr,government','NEWS_LIMIT':'100'}),patch.object(news_worker,'collect',return_value=report) as collect:
             self.assertEqual(news_worker.run_once(),report)
         self.assertEqual(collect.call_args.args[0],['cbr','government'])
-        self.assertEqual(collect.call_args.kwargs['limit'],5)
+        self.assertEqual(collect.call_args.kwargs['limit'],100)
 
     def test_invalid_configuration_does_not_collect(self):
         with patch.dict(os.environ,{'NEWS_SOURCES':'unknown'}),patch.object(news_worker,'collect') as collect:
             with self.assertRaises(ValueError):news_worker.run_once()
         collect.assert_not_called()
+
+    def test_keyword_filter_is_forwarded(self):
+        with patch.dict(os.environ, {'NEWS_KEYWORDS': ' налог, ставк, '}), patch.object(news_worker, 'collect', return_value={'sources': []}) as collect:
+            news_worker.run_once()
+        self.assertEqual(collect.call_args.kwargs['keywords'], ('налог', 'ставк'))

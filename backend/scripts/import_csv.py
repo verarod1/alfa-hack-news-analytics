@@ -34,6 +34,7 @@ class ImportError(ValueError):
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 from app.database import get_connection, DatabaseConfigError
+from app.settings import Settings
 
 
 def clean(value):
@@ -201,6 +202,10 @@ def run_import(conn, replace=False):
                     raise ImportError(
                         "Исходные таблицы уже содержат данные. Импорт отменён; для полной замены предусмотрен --replace."
                     )
+        # COPY больших CSV требует собственного срока, независимо от лимита API.
+        # LOCAL действует только в этой транзакции и отменяется при rollback.
+        conn.execute("SELECT set_config('statement_timeout', %s, true)",
+                     (str(Settings().import_statement_timeout_ms),))
         return import_companies(conn), import_payments(conn), import_person_links(conn)
 
 

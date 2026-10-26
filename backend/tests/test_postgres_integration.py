@@ -84,6 +84,7 @@ class PostgreSQLTests(TestCase):
                     "DATABASE_URL": self.dsn,
                     "DEMO_COMPANY_IDS": "U_81,U_84",
                     "ML_ADAPTER_MODULE": "",
+                    "FEED_INCLUDE_SYNTHETIC": "true",
                     "BANK_MATERIALS_PATH": "",
                     "LLM_TIMEOUT_SECONDS": "1",
                     "LLM_BASE_URL": "",
